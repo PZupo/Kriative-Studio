@@ -1,0 +1,391 @@
+import React, { useState, TouchEvent, useEffect } from 'react';
+import type { GeneratedContent, Selections, SavedContentItem } from '../types';
+import Button from './common/Button';
+import Header from './Header';
+import { useNotification } from '../contexts/NotificationContext';
+import { FORMAT_CONFIGS } from '../constants';
+import { useAuth } from '../contexts/AuthContext';
+import { geminiService } from '../services/geminiService';
+import ImageEditModal from './ImageEditModal';
+
+interface Props {
+    content: GeneratedContent;
+    onReset: () => void;
+    selections: Selections;
+}
+
+const ResultScreen: React.FC<Props> = ({ content, onReset, selections }) => {
+    const { user } = useAuth();
+    const { showToast } = useNotification();
+    const [currentContent, setCurrentContent] = useState<GeneratedContent>(content);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [touchStart, setTouchStart] = useState<number | null>(null);
+    const [touchEnd, setTouchEnd] = useState<number | null>(null);
+    const [videoBlobUrl, setVideoBlobUrl] = useState<string | null>(null);
+    const [isVideoLoading, setIsVideoLoading] = useState(true);
+    const [editingState, setEditingState] = useState<{ url: string; index: number } | null>(null);
+
+
+    const formatConfig = selections.format ? FORMAT_CONFIGS[selections.format] : null;
+    const isCarousel = selections.format === 'Carrossel' && currentContent.images && currentContent.images.length > 1;
+    
+    const isVerticalFormat = ['9:16', '3:4', '4:5'].includes(formatConfig?.aspectRatio || '');
+    const verticalContainerClass = isVerticalFormat ? 'max-w-sm mx-auto' : '';
+
+    useEffect(() => {
+        if (currentContent.videoUrl) {
+            setIsVideoLoading(true);
+            let isActive = true;
+
+            const fetchVideo = async () => {
+                try {
+                    const response = await fetch(currentContent.videoUrl!);
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    if (isActive) {
+                        setVideoBlobUrl(url);
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch video for preview:", error);
+                    if (isActive) showToast("Erro ao carregar a pré-visualização do vídeo.", "error");
+                } finally {
+                    if (isActive) setIsVideoLoading(false);
+                }
+            };
+
+            fetchVideo();
+
+            return () => {
+                isActive = false;
+                if (videoBlobUrl) {
+                    URL.revokeObjectURL(videoBlobUrl);
+                }
+            };
+        }
+    }, [currentContent.videoUrl]);
+
+
+    const handleCopy = (textToCopy: string) => {
+        navigator.clipboard.writeText(textToCopy);
+        showToast('Copiado para a área de transferência!');
+    };
+    
+    const handleDownloadImage = (imageUrl: string, index: number) => {
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.download = `kriative-studio-image-${index + 1}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleDownloadVideo = async (videoUrl: string) => {
+        showToast('Iniciando download do vídeo...', 'success');
+        try {
+            const response = await fetch(videoUrl);
+            if (!response.ok) {
+                throw new Error('Falha ao buscar o vídeo.');
+            }
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'kriative-studio-video.mp4';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Erro ao baixar o vídeo:', error);
+            showToast('Ocorreu um erro ao baixar o vídeo.', 'error');
+        }
+    };
+
+    const handleSaveContent = () => {
+        if (!user) {
+            showToast('Você precisa estar logado para salvar o conteúdo.', 'error');
+            return;
+        }
+
+        const newSavedItem: SavedContentItem = {
+            id: `saved_${Date.now()}`,
+            selections,
+            content: currentContent,
+            savedAt: new Date().toISOString(),
+        };
+
+        try {
+            const storageKey = `kriative_studio_saved_content_${user.uid}`;
+            const existingSavedContentJson = localStorage.getItem(storageKey);
+            const savedContent: SavedContentItem[] = existingSavedContentJson ? JSON.parse(existingSavedContentJson) : [];
+            
+            savedContent.unshift(newSavedItem);
+
+            localStorage.setItem(storageKey, JSON.stringify(savedContent));
+            showToast('Conteúdo salvo no seu perfil!');
+        } catch (error) {
+            console.error('Failed to save content to localStorage:', error);
+            showToast('Erro ao salvar o conteúdo.', 'error');
+        }
+    };
+
+    const handleSaveConfiguration = () => {
+        const draft = {
+            selections,
+            savedAt: new Date().toISOString()
+        };
+        localStorage.setItem('kriative_studio_draft', JSON.stringify(draft));
+        showToast('Configuração salva como rascunho!');
+    };
+
+    const handleRegenerateImage = async (prompt: string) => {
+        if (!editingState) return;
+
+        try {
+            const newImageUrl = await geminiService.editImage(editingState.url, prompt);
+            
+            const newImages = [...currentContent.images];
+            newImages[editingState.index] = newImageUrl;
+
+            setCurrentContent(prev => ({
+                ...prev,
+                images: newImages,
+            }));
+            
+            showToast('Imagem atualizada com sucesso!', 'success');
+            setEditingState(null); // Close modal
+        } catch (error) {
+            console.error("Error regenerating image:", error);
+            showToast(error instanceof Error ? error.message : 'Falha ao editar a imagem.', 'error');
+            throw error; // Propagate error to modal
+        }
+    };
+
+
+    const prevSlide = () => {
+        const isFirstSlide = currentIndex === 0;
+        const newIndex = isFirstSlide ? currentContent.images.length - 1 : currentIndex - 1;
+        setCurrentIndex(newIndex);
+    };
+
+    const nextSlide = () => {
+        const isLastSlide = currentIndex === currentContent.images.length - 1;
+        const newIndex = isLastSlide ? 0 : currentIndex + 1;
+        setCurrentIndex(newIndex);
+    };
+    
+    const minSwipeDistance = 50;
+    const onTouchStart = (e: TouchEvent) => {
+        setTouchEnd(null);
+        setTouchStart(e.targetTouches[0].clientX);
+    };
+    const onTouchMove = (e: TouchEvent) => setTouchEnd(e.targetTouches[0].clientX);
+    const onTouchEnd = () => {
+        if (!touchStart || !touchEnd) return;
+        const distance = touchStart - touchEnd;
+        const isLeftSwipe = distance > minSwipeDistance;
+        const isRightSwipe = distance < -minSwipeDistance;
+        if (isLeftSwipe) nextSlide();
+        else if (isRightSwipe) prevSlide();
+        setTouchStart(null);
+        setTouchEnd(null);
+    };
+
+
+    const ConfigurationSummary: React.FC<{ selections: Selections }> = ({ selections }) => (
+        <div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Resumo da Configuração</h2>
+            <div className="p-4 bg-gray-50 rounded-lg text-gray-700 space-y-2 text-sm">
+                <p><strong className="font-semibold text-gray-900">Plataforma:</strong> {selections.platform}</p>
+                <p><strong className="font-semibold text-gray-900">Estilo:</strong> {selections.style}</p>
+                <p><strong className="font-semibold text-gray-900">Formato:</strong> {selections.format}</p>
+                {selections.visualStyle && <p><strong className="font-semibold text-gray-900">Estilo Visual:</strong> {selections.visualStyle}</p>}
+                {currentContent.duration && <p><strong className="font-semibold text-gray-900">Duração:</strong> {currentContent.duration}s</p>}
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="min-h-screen bg-[#f5f5dc] font-sans">
+            <Header />
+            <main className="pt-28 pb-12 px-4 md:px-8">
+                <div className="max-w-6xl mx-auto bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 md:p-10 border border-gray-200 animate-fade-in">
+                    <div className="text-center mb-8">
+                        <h1 className="text-4xl font-extrabold text-[#008080]">Seu Conteúdo está Pronto!</h1>
+                        <p className="text-gray-600 mt-2">Aqui está o que nossa IA criou para você. Explore, copie e use!</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Left Side - Visuals */}
+                        <div className="space-y-6">
+                            <h2 className="text-2xl font-bold text-gray-800 border-b-2 border-[#ff8c00] pb-2">
+                               {currentContent.videoUrl ? 'Vídeo Gerado' : 'Visuais Gerados'}
+                            </h2>
+                            {currentContent.videoUrl ? (
+                                <div className="space-y-4">
+                                     <div className={`w-full rounded-lg shadow-md bg-gray-200 flex items-center justify-center ${verticalContainerClass}`} style={{ aspectRatio: formatConfig?.aspectRatio.replace(':', ' / ') }}>
+                                        {isVideoLoading ? (
+                                            <div className="text-center text-gray-500">
+                                                <i className="fa-solid fa-spinner fa-spin text-4xl"></i>
+                                                <p className="mt-2 font-semibold">Carregando pré-visualização...</p>
+                                            </div>
+                                        ) : videoBlobUrl ? (
+                                            <video key={videoBlobUrl} controls className="w-full h-full rounded-lg">
+                                                <source src={videoBlobUrl} type="video/mp4" />
+                                                Seu navegador não suporta a tag de vídeo.
+                                            </video>
+                                        ) : (
+                                            <div className="text-center text-red-500">
+                                                <i className="fa-solid fa-video-slash text-4xl"></i>
+                                                <p className="mt-2 font-semibold">Falha ao carregar o vídeo.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <Button onClick={() => handleDownloadVideo(currentContent.videoUrl!)} variant="secondary" className="w-full" disabled={!videoBlobUrl}>
+                                        <i className="fa-solid fa-download mr-2"></i> Baixar Vídeo
+                                    </Button>
+                                </div>
+                            ) : currentContent.storyboards && currentContent.storyboards.length > 0 ? (
+                                // Manga View
+                                <div className="space-y-4 max-h-[600px] overflow-y-auto p-2 bg-gray-100 rounded-lg">
+                                    {currentContent.storyboards.map((page, pageIndex) => (
+                                        <div key={pageIndex} className="p-4 bg-white rounded shadow-sm">
+                                            <h3 className="font-bold mb-2">Página {pageIndex + 1}</h3>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {page.map((panel, panelIndex) => (
+                                                    <div key={panelIndex} className="border rounded">
+                                                        <img src={panel.image} alt={`Painel ${panelIndex + 1}`} className="w-full h-auto object-cover rounded-t" />
+                                                        <p className="text-xs p-1 bg-gray-50 rounded-b">{panel.text}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : isCarousel ? (
+                                // Carousel View
+                                <div 
+                                    className="relative w-full max-w-lg mx-auto group"
+                                    style={{ aspectRatio: formatConfig?.aspectRatio.replace(':', ' / ') }}
+                                    onTouchStart={onTouchStart}
+                                    onTouchMove={onTouchMove}
+                                    onTouchEnd={onTouchEnd}
+                                >
+                                    <div className="overflow-hidden rounded-lg h-full shadow-lg bg-gray-100">
+                                        <div
+                                            className="flex transition-transform duration-700 ease-in-out h-full"
+                                            style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+                                        >
+                                            {currentContent.images.map((img, index) => (
+                                                <img
+                                                    key={index}
+                                                    src={img}
+                                                    alt={`Carousel content ${index + 1}`}
+                                                    className="w-full h-full object-cover flex-shrink-0"
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <button onClick={prevSlide} className="absolute top-1/2 left-3 transform -translate-y-1/2 bg-black/40 text-white w-10 h-10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity focus:outline-none flex items-center justify-center">
+                                        <i className="fa-solid fa-chevron-left"></i>
+                                    </button>
+                                    <button onClick={nextSlide} className="absolute top-1/2 right-3 transform -translate-y-1/2 bg-black/40 text-white w-10 h-10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity focus:outline-none flex items-center justify-center">
+                                        <i className="fa-solid fa-chevron-right"></i>
+                                    </button>
+                                    <div className="absolute top-3 right-3 flex space-x-2">
+                                        <button onClick={() => setEditingState({ url: currentContent.images[currentIndex], index: currentIndex })} className="bg-black/40 text-white w-10 h-10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity focus:outline-none flex items-center justify-center hover:bg-black/60">
+                                            <i className="fa-solid fa-pencil"></i>
+                                        </button>
+                                        <button onClick={() => handleDownloadImage(currentContent.images[currentIndex], currentIndex)} className="bg-black/40 text-white w-10 h-10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity focus:outline-none flex items-center justify-center hover:bg-black/60">
+                                            <i className="fa-solid fa-download"></i>
+                                        </button>
+                                    </div>
+                                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2">
+                                        {currentContent.images.map((_, index) => (
+                                            <button
+                                                key={index}
+                                                onClick={() => setCurrentIndex(index)}
+                                                className={`w-3 h-3 rounded-full transition-colors ${currentIndex === index ? 'bg-white' : 'bg-white/50 hover:bg-white'}`}
+                                            ></button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                // Standard Grid View
+                                <div className="grid grid-cols-2 gap-4">
+                                    {currentContent.images.map((img, index) => (
+                                         <div 
+                                            key={index} 
+                                            className={`relative group overflow-hidden rounded-lg shadow-md bg-gray-100 ${verticalContainerClass}`}
+                                            style={{ aspectRatio: formatConfig?.aspectRatio.replace(':', ' / ') }}
+                                        >
+                                            <img 
+                                                src={img} 
+                                                alt={`Generated content ${index + 1}`} 
+                                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" 
+                                            />
+                                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity space-x-4">
+                                                <button onClick={() => setEditingState({ url: img, index })} className="text-white text-3xl hover:text-yellow-400">
+                                                    <i className="fa-solid fa-pencil"></i>
+                                                </button>
+                                                <button onClick={() => handleDownloadImage(img, index)} className="text-white text-3xl hover:text-[#39ff14]">
+                                                    <i className="fa-solid fa-download"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Right Side - Text & Summary */}
+                        <div className="space-y-6">
+                            <ConfigurationSummary selections={selections} />
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-800 mb-2">Copy (Texto)</h2>
+                                <div className="relative p-4 bg-teal-50 rounded-lg text-gray-700 whitespace-pre-wrap">
+                                    <p>{currentContent.copy}</p>
+                                    <button onClick={() => handleCopy(currentContent.copy)} className="absolute top-2 right-2 text-gray-400 hover:text-[#008080]">
+                                        <i className="fa-solid fa-copy"></i>
+                                    </button>
+                                </div>
+                            </div>
+                             <div>
+                                <h2 className="text-2xl font-bold text-gray-800 mb-2">Hashtags</h2>
+                                <div className="relative p-4 bg-orange-50 rounded-lg text-gray-700">
+                                    <p className="italic">{currentContent.hashtags}</p>
+                                     <button onClick={() => handleCopy(currentContent.hashtags)} className="absolute top-2 right-2 text-gray-400 hover:text-[#ff8c00]">
+                                        <i className="fa-solid fa-copy"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-12 text-center space-y-4">
+                         <div className="flex flex-wrap justify-center items-center gap-4">
+                             <Button onClick={handleSaveConfiguration} variant="ghost">
+                                <i className="fa-solid fa-save mr-2"></i> Salvar Configuração
+                            </Button>
+                            <Button onClick={handleSaveContent} variant="primary">
+                                <i className="fa-solid fa-star mr-2"></i> Salvar Conteúdo
+                            </Button>
+                            <Button onClick={onReset} variant="secondary" className="text-lg">
+                               <i className="fa-solid fa-plus mr-2"></i> Criar Novo Conteúdo
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+             <ImageEditModal
+                isOpen={!!editingState}
+                imageUrl={editingState?.url || ''}
+                onClose={() => setEditingState(null)}
+                onRegenerate={handleRegenerateImage}
+            />
+        </div>
+    );
+};
+
+export default ResultScreen;
