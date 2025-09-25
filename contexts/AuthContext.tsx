@@ -2,12 +2,10 @@ import React, { createContext, useState, useContext, useEffect, ReactNode, useCa
 import type { User, PlanKey } from '../types';
 import { apiService } from '../services/apiService';
 import { useNotification } from './NotificationContext';
-import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 
 interface AuthContextType {
     user: User | null;
     isLoading: boolean;
-    isConfigurationMissing: boolean;
     login: (email: string, password: string) => Promise<void>;
     signup: (name: string, email: string, password: string, plan: PlanKey) => Promise<void>;
     loginWithGoogle: () => Promise<void>;
@@ -20,32 +18,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [isConfigurationMissing] = useState(!isSupabaseConfigured);
     const { showToast } = useNotification();
 
-    const fetchUserProfile = useCallback(async (userId: string) => {
-        try {
-            const profile = await apiService.getUserProfile(userId);
-            setUser(profile);
-            return profile;
-        } catch (error) {
-            console.error("Failed to fetch user profile:", error);
-            setUser(null);
-            return null;
-        }
-    }, []);
-
     useEffect(() => {
-        if (isConfigurationMissing) {
-            setIsLoading(false);
-            return; // Impede a execução se o Supabase não estiver configurado
-        }
-
         const checkSession = async () => {
             try {
                 const session = await apiService.getSession();
                 if (session?.user) {
-                    await fetchUserProfile(session.user.id);
+                    const profile = await apiService.getUserProfile(session.user.id);
+                    setUser(profile);
                 }
             } catch (error) {
                 console.error("Error checking initial session:", error);
@@ -54,49 +35,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setIsLoading(false);
             }
         };
-        
         checkSession();
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (_event, session) => {
-                setIsLoading(true);
-                try {
-                    if (session?.user) {
-                        await fetchUserProfile(session.user.id);
-                    } else {
-                        setUser(null);
-                    }
-                } catch (error) {
-                    console.error("Error on auth state change:", error);
-                    setUser(null);
-                } finally {
-                    setIsLoading(false);
-                }
-            }
-        );
-
-        return () => {
-            subscription?.unsubscribe();
-        };
-    }, [fetchUserProfile, isConfigurationMissing]);
+    }, []);
 
     const login = async (email: string, password: string) => {
-        if (isConfigurationMissing) throw new Error("Backend not configured.");
-        await apiService.login(email, password);
+        const loggedInUser = await apiService.login(email, password);
+        setUser(loggedInUser);
     };
 
     const signup = async (name: string, email: string, password: string, plan: PlanKey) => {
-        if (isConfigurationMissing) throw new Error("Backend not configured.");
-        await apiService.signup(name, email, password, plan);
+        const newUser = await apiService.signup(name, email, password, plan);
+        setUser(newUser);
     };
     
     const loginWithGoogle = async () => {
-        if (isConfigurationMissing) throw new Error("Backend not configured.");
-        await apiService.loginWithGoogle();
+        const googleUser = await apiService.loginWithGoogle();
+        setUser(googleUser);
     };
 
     const logout = async () => {
-        if (isConfigurationMissing) return;
         try {
             await apiService.logout();
             setUser(null);
@@ -107,7 +64,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     const updateUser = useCallback((updates: Partial<User>) => {
-        if (user && !isConfigurationMissing) {
+        if (user) {
             const updatedUser = { ...user, ...updates };
             setUser(updatedUser);
             apiService.updateUserProfile(user.uid, updates).catch(err => {
@@ -115,12 +72,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                  showToast("Falha ao salvar as alterações no servidor.", "error");
             });
         }
-    }, [user, showToast, isConfigurationMissing]);
+    }, [user, showToast]);
 
     const value = {
         user,
         isLoading,
-        isConfigurationMissing,
         login,
         signup,
         loginWithGoogle,

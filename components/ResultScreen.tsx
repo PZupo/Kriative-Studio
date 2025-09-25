@@ -1,14 +1,13 @@
 
 
 import React, { useState, TouchEvent, useEffect } from 'react';
+// FIX: Corrected import paths to use '../' for parent directories.
 import type { GeneratedContent, Selections, SavedContentItem } from '../types';
 import Button from './common/Button';
-// FIX: The Header component is removed as it's already present in the main App layout.
-// import Header from './Header';
 import { useNotification } from '../contexts/NotificationContext';
 import { FORMAT_CONFIGS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
-import { geminiService } from '../services/geminiService';
+import { geminiService, API_KEY } from '../services/geminiService';
 import ImageEditModal from './ImageEditModal';
 
 interface Props {
@@ -42,9 +41,8 @@ const ResultScreen: React.FC<Props> = ({ content, onReset, selections }) => {
 
             const fetchVideo = async () => {
                 try {
-                    // FIX: Append API key to fetch video URL as per Gemini API guidelines.
-                    // It's assumed process.env.API_KEY is available in the browser context via build tools.
-                    const response = await fetch(`${currentContent.videoUrl!}&key=${process.env.API_KEY}`);
+                    // FIX: Use imported API_KEY instead of process.env to avoid errors.
+                    const response = await fetch(`${currentContent.videoUrl!}&key=${API_KEY}`);
                     if (!response.ok) throw new Error('Network response was not ok');
                     const blob = await response.blob();
                     const url = URL.createObjectURL(blob);

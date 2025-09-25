@@ -1,5 +1,7 @@
+
 // FIX: Added a check to ensure the API key is defined, providing a clear error message to the developer if it's missing.
-const API_KEY = process.env.API_KEY;
+// FIX: Export API_KEY so other modules can use it without referencing process.env.
+export const API_KEY = process.env.API_KEY;
 if (!API_KEY) {
     throw new Error("API_KEY não encontrada. Por favor, crie um arquivo .env na raiz do projeto e adicione a linha: API_KEY=SUA_CHAVE_DE_API_AQUI");
 }

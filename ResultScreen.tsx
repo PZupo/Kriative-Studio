@@ -1,3 +1,4 @@
+
 // FIX: Populated this file with the correct component code and adjusted import paths to resolve compilation errors.
 import React, { useState, TouchEvent, useEffect } from 'react';
 import type { GeneratedContent, Selections, SavedContentItem } from './types';
@@ -5,12 +6,9 @@ import Button from './components/common/Button';
 import { useNotification } from './contexts/NotificationContext';
 import { FORMAT_CONFIGS } from './constants';
 import { useAuth } from './contexts/AuthContext';
-import { geminiService } from './services/geminiService';
+// FIX: Import API_KEY from geminiService to avoid using 'process' in the browser.
+import { geminiService, API_KEY } from './services/geminiService';
 import ImageEditModal from './components/ImageEditModal';
-
-// This is a workaround to access the variable defined in geminiService
-// In a real build setup, this would be available globally via the build tool (e.g., Webpack DefinePlugin)
-const API_KEY = process.env.API_KEY;
 
 interface Props {
     content: GeneratedContent;

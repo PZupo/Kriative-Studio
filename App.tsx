@@ -5,6 +5,7 @@ import { useNotification } from './contexts/NotificationContext';
 import type { Selections, GeneratedContent } from './types';
 import { geminiService } from './services/geminiService';
 import { FORMAT_CONFIGS } from './constants';
+import { isSupabaseConfigured, missingConfig } from './services/supabaseClient';
 
 // Import components
 import AuthScreen from './components/AuthScreen';
@@ -14,7 +15,7 @@ import LoadingScreen from './components/LoadingScreen';
 import ResultScreen from './ResultScreen';
 import HistoryScreen from './components/HistoryScreen';
 import CalendarScreen from './components/CalendarScreen';
-import ConfigurationScreen from './components/ConfigurationScreen'; // Import the new component
+import ConfigurationScreen from './components/ConfigurationScreen';
 
 // Step components
 import Step1Platform from './components/steps/Step1Platform';
@@ -39,7 +40,7 @@ const initialSelections: Selections = {
 type AppView = 'studio' | 'history' | 'calendar';
 
 function App() {
-    const { user, isLoading: isAuthLoading, updateUser, isConfigurationMissing } = useAuth();
+    const { user, isLoading: isAuthLoading, updateUser } = useAuth();
     const { showToast } = useNotification();
 
     // App state
@@ -48,6 +49,11 @@ function App() {
     const [selections, setSelections] = useState<Selections>(initialSelections);
     const [isLoading, setIsLoading] = useState(false);
     const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
+
+    // Check for Supabase configuration first
+    if (!isSupabaseConfigured) {
+        return <ConfigurationScreen missing={missingConfig} />;
+    }
 
     useEffect(() => {
         // Load draft from local storage on component mount
@@ -122,7 +128,11 @@ function App() {
             localStorage.removeItem('kriative_studio_draft');
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido ao gerar o conteúdo.";
-            showToast(errorMessage, 'error');
+            if (errorMessage.includes('RESOURCE_EXHAUSTED')) {
+                showToast('Cota da API atingida. Verifique sua chave.', 'error');
+            } else {
+                showToast(errorMessage, 'error');
+            }
         } finally {
             setIsLoading(false);
         }
@@ -133,6 +143,13 @@ function App() {
         setSelections(initialSelections);
         setCurrentStep(1);
         setView('studio');
+    };
+    
+     const handleNavigate = (newView: AppView) => {
+        if (generatedContent) {
+            setGeneratedContent(null); // Clear result before navigating away
+        }
+        setView(newView);
     };
 
     const renderStudioContent = () => {
@@ -175,10 +192,6 @@ function App() {
         }
     };
 
-    if (isConfigurationMissing) {
-        return <ConfigurationScreen />;
-    }
-
     if (isAuthLoading) {
         return (
             <div className="min-h-screen bg-[#f5f5dc] flex items-center justify-center">
@@ -193,7 +206,7 @@ function App() {
 
     return (
         <div className="min-h-screen bg-[#f5f5dc] font-sans">
-            <Header currentView={view} onNavigate={setView} />
+            <Header currentView={view} onNavigate={handleNavigate} />
             <main className="pt-28 pb-12 px-4">
                 {renderView()}
             </main>
