@@ -1,7 +1,6 @@
-import React, { createContext, useState, useContext, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import type { User, PlanKey } from '../types';
 import { apiService } from '../services/apiService';
-import { useNotification } from './NotificationContext';
 
 interface AuthContextType {
     user: User | null;
@@ -18,7 +17,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const { showToast } = useNotification();
 
     useEffect(() => {
         const checkSession = async () => {
@@ -29,50 +27,48 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     setUser(profile);
                 }
             } catch (error) {
-                console.error("Error checking initial session:", error);
+                console.error("Error checking session:", error);
+                // If the session is invalid, ensure user is logged out
                 setUser(null);
             } finally {
                 setIsLoading(false);
             }
         };
+
         checkSession();
     }, []);
 
     const login = async (email: string, password: string) => {
-        const loggedInUser = await apiService.login(email, password);
-        setUser(loggedInUser);
+        const profile = await apiService.login(email, password);
+        setUser(profile);
     };
 
     const signup = async (name: string, email: string, password: string, plan: PlanKey) => {
-        const newUser = await apiService.signup(name, email, password, plan);
-        setUser(newUser);
+        const profile = await apiService.signup(name, email, password, plan);
+        setUser(profile);
     };
     
     const loginWithGoogle = async () => {
-        const googleUser = await apiService.loginWithGoogle();
-        setUser(googleUser);
+        await apiService.loginWithGoogle();
+        // Supabase redirects, session is caught by useEffect on return
     };
 
     const logout = async () => {
-        try {
-            await apiService.logout();
-            setUser(null);
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : "Erro ao fazer logout.";
-            showToast(errorMessage, 'error');
-        }
+        await apiService.logout();
+        setUser(null);
     };
 
-    const updateUser = useCallback((updates: Partial<User>) => {
+    const updateUser = (updates: Partial<User>) => {
         if (user) {
             const updatedUser = { ...user, ...updates };
             setUser(updatedUser);
-            apiService.updateUserProfile(user.uid, updates).catch(err => {
-                 console.error("Failed to update user profile on backend", err);
-                 showToast("Falha ao salvar as alterações no servidor.", "error");
+            // Persist changes to backend asynchronously
+            apiService.updateUserProfile(user.uid, updates).catch(error => {
+                 console.error("Failed to update user profile on backend:", error);
+                 // Optionally revert state or show an error notification to the user
             });
         }
-    }, [user, showToast]);
+    };
 
     const value = {
         user,
@@ -84,11 +80,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         updateUser,
     };
 
-    return (
-        <AuthContext.Provider value={value}>
-            {children}
-        </AuthContext.Provider>
-    );
+    if (isLoading) {
+        return (
+            <div className="fixed inset-0 bg-[#f5f5dc] flex items-center justify-center">
+                <i className="fa-solid fa-spinner fa-spin text-4xl text-[#008080]"></i>
+            </div>
+        );
+    }
+    
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = (): AuthContextType => {

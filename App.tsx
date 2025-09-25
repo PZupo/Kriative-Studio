@@ -1,29 +1,32 @@
-// FIX: Implemented the main App component to orchestrate the entire application flow, resolving the 'not a module' error.
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from './contexts/AuthContext';
-import { useNotification } from './contexts/NotificationContext';
-import type { Selections, GeneratedContent } from './types';
-import { geminiService } from './services/geminiService';
-import { FORMAT_CONFIGS } from './constants';
 import { isSupabaseConfigured, missingConfig } from './services/supabaseClient';
+import type { Selections, GeneratedContent } from './types';
+import { FORMAT_CONFIGS } from './constants';
 
-// Import components
+// Import Screens and Components
+import ConfigurationScreen from './components/ConfigurationScreen';
 import AuthScreen from './components/AuthScreen';
 import Header from './components/Header';
-import StepIndicator from './components/StepIndicator';
-import LoadingScreen from './components/LoadingScreen';
-import ResultScreen from './ResultScreen';
 import HistoryScreen from './components/HistoryScreen';
 import CalendarScreen from './components/CalendarScreen';
-import ConfigurationScreen from './components/ConfigurationScreen';
+import LoadingScreen from './components/LoadingScreen';
+import ResultScreen from './ResultScreen';
+import StartupErrorScreen from './components/StartupErrorScreen';
 
-// Step components
+// Import Step components
 import Step1Platform from './components/steps/Step1Platform';
 import Step2Style from './components/steps/Step2Style';
 import Step3Format from './components/steps/Step3Format';
 import Step4VisualStyle from './components/steps/Step4VisualStyle';
 import Step5InputType from './components/steps/Step5InputType';
 import Step6Describe from './components/steps/Step6Describe';
+import StepIndicator from './components/StepIndicator';
+import { geminiService } from './services/geminiService';
+import { useNotification } from './contexts/NotificationContext';
+
+type AppView = 'studio' | 'history' | 'calendar';
+type GenerationState = 'configuring' | 'loading' | 'result';
 
 const initialSelections: Selections = {
     platform: null,
@@ -37,181 +40,147 @@ const initialSelections: Selections = {
     duration: 30,
 };
 
-type AppView = 'studio' | 'history' | 'calendar';
-
-function App() {
-    const { user, isLoading: isAuthLoading, updateUser } = useAuth();
+const App: React.FC = () => {
+    const { user, updateUser } = useAuth();
     const { showToast } = useNotification();
+    
+    // Global App State
+    const [currentView, setCurrentView] = useState<AppView>('studio');
+    const [error, setError] = useState<string | null>(null);
 
-    // App state
-    const [view, setView] = useState<AppView>('studio');
+    // Generation Flow State
+    const [generationState, setGenerationState] = useState<GenerationState>('configuring');
     const [currentStep, setCurrentStep] = useState(1);
     const [selections, setSelections] = useState<Selections>(initialSelections);
-    const [isLoading, setIsLoading] = useState(false);
     const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
 
-    // Check for Supabase configuration first
+    // Catch any critical errors during startup
     if (!isSupabaseConfigured) {
         return <ConfigurationScreen missing={missingConfig} />;
-    }
-
-    useEffect(() => {
-        // Load draft from local storage on component mount
-        const draftJson = localStorage.getItem('kriative_studio_draft');
-        if (draftJson) {
-            try {
-                const draft = JSON.parse(draftJson);
-                // Simple validation
-                if (draft.selections && draft.selections.platform) {
-                    setSelections(draft.selections);
-                    showToast('Rascunho carregado com sucesso!');
-                }
-            } catch (e) {
-                console.error("Failed to parse draft from localStorage", e);
-                localStorage.removeItem('kriative_studio_draft');
-            }
-        }
-    }, [showToast]);
-
-    const handleUpdateSelections = (updates: Partial<Selections>) => {
-        setSelections(prev => ({ ...prev, ...updates }));
-    };
-
-    const nextStep = () => setCurrentStep(prev => prev + 1);
-    const prevStep = () => setCurrentStep(prev => prev - 1);
-
-    const calculateCredits = (): number => {
-        if (!selections.format) return 1;
-        
-        let credits = 0;
-        const config = FORMAT_CONFIGS[selections.format];
-        
-        if (config.isVideo) {
-            // Example: 1 credit per 15 seconds of video
-            credits = Math.ceil((selections.duration || config.maxDuration) / 15);
-        } else if (selections.style === 'Estilo Mangá') {
-            // Example: 2 credits per page for manga
-            credits = selections.quantity * 2;
-        } else {
-            // 1 credit per image
-            credits = selections.quantity;
-        }
-        
-        // Add extra credit for complexity if image prompt is used
-        if (selections.inputType === 'Prompt de Imagem' && selections.imagePrompt) {
-            credits += 1;
-        }
-        
-        return Math.max(1, credits);
-    };
-    
-    const creditsNeeded = calculateCredits();
-
-    const handleSubmit = async () => {
-        if (!user) {
-            showToast('Erro de autenticação.', 'error');
-            return;
-        }
-        if (user.credits < creditsNeeded) {
-            showToast('Créditos insuficientes.', 'error');
-            return;
-        }
-
-        setIsLoading(true);
-        setGeneratedContent(null);
-
-        try {
-            const content = await geminiService.generateContent(selections);
-            setGeneratedContent(content);
-            updateUser({ credits: user.credits - creditsNeeded });
-            // Clear draft on successful submission
-            localStorage.removeItem('kriative_studio_draft');
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido ao gerar o conteúdo.";
-            if (errorMessage.includes('RESOURCE_EXHAUSTED')) {
-                showToast('Cota da API atingida. Verifique sua chave.', 'error');
-            } else {
-                showToast(errorMessage, 'error');
-            }
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    
-    const handleReset = () => {
-        setGeneratedContent(null);
-        setSelections(initialSelections);
-        setCurrentStep(1);
-        setView('studio');
-    };
-    
-     const handleNavigate = (newView: AppView) => {
-        if (generatedContent) {
-            setGeneratedContent(null); // Clear result before navigating away
-        }
-        setView(newView);
-    };
-
-    const renderStudioContent = () => {
-        if (isLoading) {
-            return <LoadingScreen selections={selections} />;
-        }
-        if (generatedContent) {
-            return <ResultScreen content={generatedContent} onReset={handleReset} selections={selections} />;
-        }
-
-        const steps = [
-            <Step1Platform selections={selections} onSelect={(p) => handleUpdateSelections({ platform: p, format: null })} onNext={nextStep} />,
-            <Step2Style selections={selections} onSelect={(s) => handleUpdateSelections({ style: s, format: null })} onNext={nextStep} onBack={prevStep} />,
-            <Step3Format selections={selections} onUpdate={handleUpdateSelections} onNext={nextStep} onBack={prevStep} />,
-            <Step4VisualStyle selections={selections} onSelect={(vs) => handleUpdateSelections({ visualStyle: vs })} onNext={nextStep} onBack={prevStep} />,
-            <Step5InputType selections={selections} onSelect={(it) => handleUpdateSelections({ inputType: it })} onNext={nextStep} onBack={prevStep} />,
-            <Step6Describe selections={selections} onUpdate={handleUpdateSelections} onSubmit={handleSubmit} onBack={prevStep} creditsNeeded={creditsNeeded} />
-        ];
-
-        return (
-            <div className="max-w-4xl mx-auto space-y-8">
-                <StepIndicator currentStep={currentStep} />
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 md:p-10 border border-gray-200">
-                    {steps[currentStep - 1]}
-                </div>
-            </div>
-        );
-    };
-
-    const renderView = () => {
-        switch (view) {
-            case 'studio':
-                return renderStudioContent();
-            case 'history':
-                return <HistoryScreen onNavigate={setView} />;
-            case 'calendar':
-                return <CalendarScreen onNavigate={setView} />;
-            default:
-                return renderStudioContent();
-        }
-    };
-
-    if (isAuthLoading) {
-        return (
-            <div className="min-h-screen bg-[#f5f5dc] flex items-center justify-center">
-                <i className="fa-solid fa-spinner fa-spin text-4xl text-[#008080]"></i>
-            </div>
-        );
     }
 
     if (!user) {
         return <AuthScreen />;
     }
 
+    const handleUpdateSelections = (updates: Partial<Selections>) => {
+        setSelections(prev => ({ ...prev, ...updates }));
+    };
+
+    const handleNextStep = () => {
+        setCurrentStep(prev => prev + 1);
+    };
+
+    const handleBackStep = () => {
+        setCurrentStep(prev => prev - 1);
+    };
+    
+    const creditsNeeded = useMemo(() => {
+        const { style, format, quantity, duration } = selections;
+        if (!format) return 1;
+
+        const formatConfig = FORMAT_CONFIGS[format];
+        if (!formatConfig) return 1;
+
+        if (style === 'Estilo Mangá') {
+             if (format === 'Revista') return quantity * 2 + 1; // 2 per page + 1 for copy
+             if (format === 'Vídeo Animado') return 7; // Flat rate for animated video
+        }
+        
+        if (formatConfig.isVideo) {
+             if (duration <= 60) return 5;
+             if (duration <= 180) return 13;
+             return 21;
+        }
+
+        if (formatConfig.isMultiQuantity) {
+            return quantity + 1; // 1 per image + 1 for copy
+        }
+        
+        return 1; // Standard single image
+    }, [selections]);
+
+    const handleSubmit = async () => {
+        if (!user || user.credits < creditsNeeded) {
+            showToast('Créditos insuficientes para gerar este conteúdo.', 'error');
+            return;
+        }
+
+        setGenerationState('loading');
+        try {
+            const content = await geminiService.generateContent(selections);
+            setGeneratedContent(content);
+            setGenerationState('result');
+            // Deduct credits
+            updateUser({ credits: user.credits - creditsNeeded });
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : "Ocorreu um erro desconhecido.";
+            console.error("Generation failed:", err);
+            setError(`Falha na geração: ${errorMessage}`);
+            showToast(`Falha na geração: ${errorMessage}`, 'error');
+            setGenerationState('configuring'); // Go back to config on error
+        }
+    };
+
+    const handleReset = () => {
+        setSelections(initialSelections);
+        setGeneratedContent(null);
+        setCurrentStep(1);
+        setGenerationState('configuring');
+        setError(null);
+    };
+
+    const renderStudio = () => {
+        if (error) {
+            return <StartupErrorScreen message={error} onRetry={handleReset} />;
+        }
+        
+        switch (generationState) {
+            case 'loading':
+                return <LoadingScreen selections={selections} />;
+            case 'result':
+                return <ResultScreen content={generatedContent!} onReset={handleReset} selections={selections} />;
+            case 'configuring':
+            default:
+                const steps = [
+                    <Step1Platform selections={selections} onSelect={(p) => handleUpdateSelections({ platform: p })} onNext={handleNextStep} />,
+                    <Step2Style selections={selections} onSelect={(s) => handleUpdateSelections({ style: s })} onNext={handleNextStep} onBack={handleBackStep} />,
+                    <Step3Format selections={selections} onUpdate={handleUpdateSelections} onNext={handleNextStep} onBack={handleBackStep} />,
+                    <Step4VisualStyle selections={selections} onSelect={(vs) => handleUpdateSelections({ visualStyle: vs })} onNext={handleNextStep} onBack={handleBackStep} />,
+                    <Step5InputType selections={selections} onSelect={(it) => handleUpdateSelections({ inputType: it })} onNext={handleNextStep} onBack={handleBackStep} />,
+                    <Step6Describe selections={selections} onUpdate={handleUpdateSelections} onSubmit={handleSubmit} onBack={handleBackStep} creditsNeeded={creditsNeeded} />,
+                ];
+                return (
+                    <div className="max-w-4xl mx-auto">
+                        <div className="mb-10">
+                            <StepIndicator currentStep={currentStep} />
+                        </div>
+                        {steps[currentStep - 1]}
+                    </div>
+                );
+        }
+    };
+
+    const renderCurrentView = () => {
+        switch (currentView) {
+            case 'history':
+                return <HistoryScreen onNavigate={setCurrentView} />;
+            case 'calendar':
+                return <CalendarScreen onNavigate={setCurrentView} />;
+            case 'studio':
+            default:
+                return renderStudio();
+        }
+    };
+
     return (
         <div className="min-h-screen bg-[#f5f5dc] font-sans">
-            <Header currentView={view} onNavigate={handleNavigate} />
+            <Header currentView={currentView} onNavigate={setCurrentView} />
             <main className="pt-28 pb-12 px-4">
-                {renderView()}
+                {renderCurrentView()}
             </main>
         </div>
     );
-}
+};
 
 export default App;

@@ -4,12 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kriative Social Studio</title>
-    <!-- Supabase JS CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
     <!-- Basic global styles and animations -->
     <style>
         body {
@@ -53,26 +52,26 @@
             animation: toast-in 0.5s forwards;
         }
     </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.20.0",
+    "jspdf-autotable": "https://aistudiocdn.com/jspdf-autotable@^5.0.2",
+    "vite": "https://aistudiocdn.com/vite@^7.1.7",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.0.3",
+    "jspdf": "https://aistudiocdn.com/jspdf@^3.0.3"
+  }
+}
+</script>
 </head>
 <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
 
-    <!-- Import Map for ES Modules -->
-    <script type="importmap">
-    {
-      "imports": {
-        "react": "https://aistudiocdn.com/react@^19.1.1",
-        "react/": "https://aistudiocdn.com/react@^19.1.1/",
-        "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
-        "@google/genai": "https://aistudiocdn.com/@google/genai@^1.20.0",
-        "jspdf": "https://aistudiocdn.com/jspdf@^2.5.1",
-        "jspdf-autotable": "https://aistudiocdn.com/jspdf-autotable@^3.8.2"
-      }
-    }
-    </script>
-
-    <!-- Main application script -->
+    <!-- Main application script loaded by Vite -->
     <script type="module" src="/index.tsx"></script>
 </body>
 </html>
