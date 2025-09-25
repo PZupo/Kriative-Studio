@@ -1,11 +1,4 @@
-// This file now relies on the global Supabase client loaded via CDN in index.html
-declare global {
-    interface Window {
-        supabase: {
-            createClient: (url: string, key: string) => any;
-        };
-    }
-}
+import { createClient } from '@supabase/supabase-js';
 
 // Placeholders for the check
 const SUPABASE_URL_PLACEHOLDER = 'URL_DO_SEU_PROJETO_SUPABASE_AQUI';
@@ -29,18 +22,12 @@ if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY === SUPABASE_KEY_PLACEHOLDER) {
 
 export const isSupabaseConfigured = missingConfig.length === 0;
 
-let supabase: any = null; // Use 'any' type for the globally injected client
+let supabase: any = null;
 
 // Initialize the client only if both keys are provided
 if (isSupabaseConfigured) {
     try {
-        if (window.supabase && typeof window.supabase.createClient === 'function') {
-            const { createClient } = window.supabase;
-            supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        } else {
-             // This case should not happen with the `defer` script loading, but it's a safe fallback.
-             console.error("Supabase client library not loaded on window object.");
-        }
+        supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     } catch (error) {
         console.error("Supabase client initialization failed:", error);
     }
