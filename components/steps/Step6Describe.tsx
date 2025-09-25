@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Selections } from '../../types';
 import { FORMAT_CONFIGS } from '../../constants';
@@ -11,16 +12,10 @@ interface Props {
     onUpdate: (updates: Partial<Selections>) => void;
     onSubmit: () => void;
     onBack: () => void;
+    creditsNeeded: number;
 }
 
-// Credit cost calibration
-const CREDIT_COST = {
-    PER_IMAGE: 1,
-    PER_MANGA_PAGE: 5, // A page has multiple panels, so it's more expensive
-    PER_VIDEO_SECOND: 2,
-};
-
-const Step6Describe: React.FC<Props> = ({ selections, onUpdate, onSubmit, onBack }) => {
+const Step6Describe: React.FC<Props> = ({ selections, onUpdate, onSubmit, onBack, creditsNeeded }) => {
     const { user } = useAuth();
     const { showToast } = useNotification();
     const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -29,20 +24,6 @@ const Step6Describe: React.FC<Props> = ({ selections, onUpdate, onSubmit, onBack
 
     const isMultiQuantity = formatConfig?.isMultiQuantity || false;
     const maxQuantity = formatConfig?.maxQuantity || 1;
-
-    const creditsNeeded = useMemo(() => {
-        if (!formatConfig) return 0;
-
-        if (formatConfig.isVideo) {
-            return (selections.duration || 0) * CREDIT_COST.PER_VIDEO_SECOND;
-        }
-
-        if (selections.style === 'Estilo Mangá') {
-            return selections.quantity * CREDIT_COST.PER_MANGA_PAGE;
-        }
-
-        return selections.quantity * CREDIT_COST.PER_IMAGE;
-    }, [selections, formatConfig]);
     
     const hasEnoughCredits = user ? user.credits >= creditsNeeded : false;
 
@@ -111,7 +92,7 @@ const Step6Describe: React.FC<Props> = ({ selections, onUpdate, onSubmit, onBack
                         rows={5}
                         className="w-full p-4 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008080]"
                     />
-                    <button onClick={handleGeneratePrompt} title="Gerar um prompt profissional (mock)" className="absolute top-3 right-3 text-gray-400 hover:text-[#ff8c00]">
+                    <button onClick={handleGeneratePrompt} title="Gerar um prompt profissional" className="absolute top-3 right-3 text-gray-400 hover:text-[#ff8c00]">
                        <i className="fa-solid fa-wand-magic-sparkles text-2xl"></i>
                     </button>
                 </div>

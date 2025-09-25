@@ -1,60 +1,135 @@
-import React, { createContext, useState, useContext, ReactNode, useCallback } from 'react';
-import type { User } from '../types';
-import { PLAN_CONFIGS } from '../constants';
-
-type PlanKey = keyof typeof PLAN_CONFIGS;
+import React, { createContext, useState, useContext, useEffect, ReactNode, useCallback } from 'react';
+import type { User, PlanKey } from '../types';
+import { apiService } from '../services/apiService';
+import { useNotification } from './NotificationContext';
+import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 
 interface AuthContextType {
     user: User | null;
-    login: (name: string, email: string, plan: PlanKey) => void;
-    logout: () => void;
+    isLoading: boolean;
+    isConfigurationMissing: boolean;
+    login: (email: string, password: string) => Promise<void>;
+    signup: (name: string, email: string, password: string, plan: PlanKey) => Promise<void>;
+    loginWithGoogle: () => Promise<void>;
+    logout: () => Promise<void>;
     updateUser: (updates: Partial<User>) => void;
-    switchPlan: (newPlan: PlanKey) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isConfigurationMissing] = useState(!isSupabaseConfigured);
+    const { showToast } = useNotification();
 
-    const login = (name: string, email: string, plan: PlanKey) => {
-        const planConfig = PLAN_CONFIGS[plan];
-        const newUser: User = {
-            uid: `user_${Date.now()}`,
-            name,
-            email,
-            plan: plan,
-            credits: planConfig.credits,
-            mangaGenerations: 999, // Manga is now paid with credits
+    const fetchUserProfile = useCallback(async (userId: string) => {
+        try {
+            const profile = await apiService.getUserProfile(userId);
+            setUser(profile);
+            return profile;
+        } catch (error) {
+            console.error("Failed to fetch user profile:", error);
+            setUser(null);
+            return null;
+        }
+    }, []);
+
+    useEffect(() => {
+        if (isConfigurationMissing) {
+            setIsLoading(false);
+            return; // Impede a execução se o Supabase não estiver configurado
+        }
+
+        const checkSession = async () => {
+            try {
+                const session = await apiService.getSession();
+                if (session?.user) {
+                    await fetchUserProfile(session.user.id);
+                }
+            } catch (error) {
+                console.error("Error checking initial session:", error);
+                setUser(null);
+            } finally {
+                setIsLoading(false);
+            }
         };
-        setUser(newUser);
+        
+        checkSession();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (_event, session) => {
+                setIsLoading(true);
+                try {
+                    if (session?.user) {
+                        await fetchUserProfile(session.user.id);
+                    } else {
+                        setUser(null);
+                    }
+                } catch (error) {
+                    console.error("Error on auth state change:", error);
+                    setUser(null);
+                } finally {
+                    setIsLoading(false);
+                }
+            }
+        );
+
+        return () => {
+            subscription?.unsubscribe();
+        };
+    }, [fetchUserProfile, isConfigurationMissing]);
+
+    const login = async (email: string, password: string) => {
+        if (isConfigurationMissing) throw new Error("Backend not configured.");
+        await apiService.login(email, password);
     };
 
-    const logout = () => {
-        setUser(null);
+    const signup = async (name: string, email: string, password: string, plan: PlanKey) => {
+        if (isConfigurationMissing) throw new Error("Backend not configured.");
+        await apiService.signup(name, email, password, plan);
     };
     
-    const updateUser = (updates: Partial<User>) => {
-        if (user) {
-            setUser(prevUser => ({ ...prevUser!, ...updates }));
+    const loginWithGoogle = async () => {
+        if (isConfigurationMissing) throw new Error("Backend not configured.");
+        await apiService.loginWithGoogle();
+    };
+
+    const logout = async () => {
+        if (isConfigurationMissing) return;
+        try {
+            await apiService.logout();
+            setUser(null);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "Erro ao fazer logout.";
+            showToast(errorMessage, 'error');
         }
     };
 
-    const switchPlan = (newPlan: PlanKey) => {
-        if(user) {
-            const planConfig = PLAN_CONFIGS[newPlan];
-            // In a real app, this would involve a billing process.
-            // Here, we just update the user's state.
-            setUser(prevUser => ({
-                ...prevUser!,
-                plan: newPlan,
-                credits: planConfig.credits, // Reset credits on plan change
-            }));
+    const updateUser = useCallback((updates: Partial<User>) => {
+        if (user && !isConfigurationMissing) {
+            const updatedUser = { ...user, ...updates };
+            setUser(updatedUser);
+            apiService.updateUserProfile(user.uid, updates).catch(err => {
+                 console.error("Failed to update user profile on backend", err);
+                 showToast("Falha ao salvar as alterações no servidor.", "error");
+            });
         }
+    }, [user, showToast, isConfigurationMissing]);
+
+    const value = {
+        user,
+        isLoading,
+        isConfigurationMissing,
+        login,
+        signup,
+        loginWithGoogle,
+        logout,
+        updateUser,
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, updateUser, switchPlan }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );

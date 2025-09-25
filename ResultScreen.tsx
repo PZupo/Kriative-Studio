@@ -1,15 +1,16 @@
-
-
+// FIX: Populated this file with the correct component code and adjusted import paths to resolve compilation errors.
 import React, { useState, TouchEvent, useEffect } from 'react';
-import type { GeneratedContent, Selections, SavedContentItem } from '../types';
-import Button from './common/Button';
-// FIX: The Header component is removed as it's already present in the main App layout.
-// import Header from './Header';
-import { useNotification } from '../contexts/NotificationContext';
-import { FORMAT_CONFIGS } from '../constants';
-import { useAuth } from '../contexts/AuthContext';
-import { geminiService } from '../services/geminiService';
-import ImageEditModal from './ImageEditModal';
+import type { GeneratedContent, Selections, SavedContentItem } from './types';
+import Button from './components/common/Button';
+import { useNotification } from './contexts/NotificationContext';
+import { FORMAT_CONFIGS } from './constants';
+import { useAuth } from './contexts/AuthContext';
+import { geminiService } from './services/geminiService';
+import ImageEditModal from './components/ImageEditModal';
+
+// This is a workaround to access the variable defined in geminiService
+// In a real build setup, this would be available globally via the build tool (e.g., Webpack DefinePlugin)
+const API_KEY = process.env.API_KEY;
 
 interface Props {
     content: GeneratedContent;
@@ -42,9 +43,10 @@ const ResultScreen: React.FC<Props> = ({ content, onReset, selections }) => {
 
             const fetchVideo = async () => {
                 try {
-                    // FIX: Append API key to fetch video URL as per Gemini API guidelines.
-                    // It's assumed process.env.API_KEY is available in the browser context via build tools.
-                    const response = await fetch(`${currentContent.videoUrl!}&key=${process.env.API_KEY}`);
+                    if (!API_KEY) {
+                         throw new Error("API Key not found for fetching video.");
+                    }
+                    const response = await fetch(`${currentContent.videoUrl!}&key=${API_KEY}`);
                     if (!response.ok) throw new Error('Network response was not ok');
                     const blob = await response.blob();
                     const url = URL.createObjectURL(blob);
@@ -112,18 +114,34 @@ const ResultScreen: React.FC<Props> = ({ content, onReset, selections }) => {
             savedAt: new Date().toISOString(),
         };
 
-        try {
-            const storageKey = `kriative_studio_saved_content_${user.uid}`;
-            const existingSavedContentJson = localStorage.getItem(storageKey);
-            const savedContent: SavedContentItem[] = existingSavedContentJson ? JSON.parse(existingSavedContentJson) : [];
-            
-            savedContent.unshift(newSavedItem);
+        const storageKey = `kriative_studio_saved_content_${user.uid}`;
+        let savedContent: SavedContentItem[] = [];
 
+        try {
+            const existingContent = localStorage.getItem(storageKey);
+            if (existingContent) {
+                savedContent = JSON.parse(existingContent);
+            }
+        } catch (error) {
+            console.error("Error parsing saved content from localStorage:", error);
+            savedContent = []; // Start fresh if parsing fails
+        }
+
+        // Add the new item to the beginning
+        savedContent.unshift(newSavedItem);
+
+        // Limit the history to the 10 most recent items to manage storage
+        const MAX_SAVED_ITEMS = 10;
+        if (savedContent.length > MAX_SAVED_ITEMS) {
+            savedContent = savedContent.slice(0, MAX_SAVED_ITEMS);
+        }
+
+        try {
             localStorage.setItem(storageKey, JSON.stringify(savedContent));
             showToast('Salvo! Agende em "Minhas Criações".');
         } catch (error) {
             console.error('Failed to save content to localStorage:', error);
-            showToast('Erro ao salvar o conteúdo.', 'error');
+            showToast('Erro ao salvar: o conteúdo é muito grande para a galeria.', 'error');
         }
     };
 
@@ -194,7 +212,6 @@ const ResultScreen: React.FC<Props> = ({ content, onReset, selections }) => {
         </div>
     );
 
-    // FIX: Removed redundant page layout. The component is rendered within App.tsx's layout.
     return (
         <>
             <div className="max-w-6xl mx-auto bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 md:p-10 border border-gray-200 animate-fade-in">

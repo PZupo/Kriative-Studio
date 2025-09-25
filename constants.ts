@@ -1,82 +1,83 @@
+import { PlanKey } from "./types";
 
-export const PLATFORMS: ('Instagram' | 'TikTok' | 'YouTube')[] = ['Instagram', 'TikTok', 'YouTube'];
+export const PLATFORMS = ['Instagram', 'TikTok', 'YouTube'];
+export const STYLES = ['Padrão', 'Estilo Mangá'];
+export const INPUT_TYPES = ['Prompt de Texto', 'Prompt de Imagem'];
+export const VISUAL_STYLES = ['Realista', 'Disney', 'Pixar', 'Studio Ghibli', 'Cartoon', 'Aquarela', 'Minimalista', 'Vintage'];
 
-export const STYLES: ('Padrão' | 'Estilo Mangá')[] = ['Padrão', 'Estilo Mangá'];
+export const VIDEO_FORMATS = ['Reel', 'Vídeo/Post', 'Shorts', 'Vídeo', 'Vídeo Animado'];
 
-// Centralized Format Configuration
-export interface FormatConfig {
-    dimensions: string;
-    aspectRatio: '1:1' | '9:16' | '16:9' | '4:5' | '3:4';
-    isMultiQuantity: boolean;
-    isVideo: boolean;
-    maxDuration?: number; // in seconds
-    maxQuantity: number;
-}
-
-export const FORMAT_CONFIGS: { [key: string]: FormatConfig } = {
-    // Instagram
-    'Feed': { dimensions: '1080x1080px para 1:1', aspectRatio: '1:1', isMultiQuantity: true, isVideo: false, maxQuantity: 4 },
-    'Stories': { dimensions: '1080x1920px para 9:16', aspectRatio: '9:16', isMultiQuantity: false, isVideo: true, maxDuration: 15, maxQuantity: 1 },
-    'Reel': { dimensions: '1080x1920px para 9:16', aspectRatio: '9:16', isMultiQuantity: false, isVideo: true, maxDuration: 90, maxQuantity: 1 },
-    'Carrossel': { dimensions: '1080x1080px para 1:1 (por item)', aspectRatio: '1:1', isMultiQuantity: true, isVideo: false, maxQuantity: 10 },
-    // TikTok
-    'Vídeo/Post': { dimensions: '1080x1920px para 9:16', aspectRatio: '9:16', isMultiQuantity: false, isVideo: true, maxDuration: 180, maxQuantity: 1 },
-    // YouTube
-    'Shorts': { dimensions: '1080x1920px para 9:16', aspectRatio: '9:16', isMultiQuantity: false, isVideo: true, maxDuration: 60, maxQuantity: 1 },
-    'Vídeo': { dimensions: '1920x1080px para 16:9', aspectRatio: '16:9', isMultiQuantity: false, isVideo: true, maxDuration: 600, maxQuantity: 1 },
-    // Manga
-    'Revista': { dimensions: '1080x1440px (por página)', aspectRatio: '3:4', isMultiQuantity: true, isVideo: false, maxQuantity: 20 },
-    // Shared
-    'Vídeo Animado': { dimensions: '1080x1920px para 9:16', aspectRatio: '9:16', isMultiQuantity: false, isVideo: true, maxDuration: 60, maxQuantity: 1 },
-};
-
-export const FORMATS: { [key in typeof PLATFORMS[number]]: string[] } = {
+export const FORMATS: { [key: string]: string[] } = {
     Instagram: ['Feed', 'Stories', 'Reel', 'Carrossel'],
-    TikTok: ['Vídeo/Post', 'Stories', 'Vídeo Animado'],
+    TikTok: ['Vídeo/Post'],
     YouTube: ['Shorts', 'Vídeo'],
 };
 
-// Fix: Add and export the missing VIDEO_FORMATS constant to resolve an import error in LoadingScreen.tsx.
-export const VIDEO_FORMATS: string[] = Object.keys(FORMAT_CONFIGS).filter(
-    (key) => FORMAT_CONFIGS[key].isVideo
-);
+export const MANGA_FORMATS = ['Revista', 'Vídeo Animado'];
 
-export const MANGA_FORMATS: string[] = ['Revista'];
+interface PlanConfig {
+    name: string;
+    price: string;
+    credits: number;
+    maxVideoDuration: number;
+    features: string[];
+}
 
-export const VISUAL_STYLES: ('Realista' | 'Disney' | 'Pixar' | 'Studio Ghibli' | 'Cartoon' | 'Aquarela' | 'Minimalista' | 'Vintage')[] = [
-    'Realista',
-    'Disney',
-    'Pixar',
-    'Studio Ghibli',
-    'Cartoon',
-    'Aquarela',
-    'Minimalista',
-    'Vintage',
-];
-
-export const INPUT_TYPES: ('Prompt de Texto' | 'Prompt de Imagem')[] = ['Prompt de Texto', 'Prompt de Imagem'];
-
-// Centralized Plan Configuration
-export const PLAN_CONFIGS = {
-    associado: {
-        name: 'Associado',
-        price: 'R$ 197,00/mês (Incluso no Pacote)',
-        credits: 1000,
-        maxVideoDuration: 90,
-        features: ['1.000 créditos/mês', 'Vídeos de até 90s', 'Ideal para membros do pacote'],
-    },
+export const PLAN_CONFIGS: Record<PlanKey, PlanConfig> = {
     pro: {
-        name: 'Pro',
-        price: 'R$ 97,00/mês',
-        credits: 2500,
-        maxVideoDuration: 180,
-        features: ['2.500 créditos/mês', 'Vídeos de até 3 min', 'Perfeito para criadores de conteúdo'],
+        name: 'Plano Pro',
+        price: 'R$49/mês (ou R$490/ano)',
+        credits: 100,
+        maxVideoDuration: 60,
+        features: [
+            '100 créditos por mês',
+            'Criação de imagens e carrosséis',
+            'Vídeos de até 60 segundos',
+            'Acesso a todos os estilos visuais',
+            'Planejador de Conteúdo com IA'
+        ],
     },
     studio: {
-        name: 'Studio',
-        price: 'R$ 247,00/mês',
-        credits: 7000,
-        maxVideoDuration: 300,
-        features: ['7.000 créditos/mês', 'Vídeos de até 5 min', 'Ideal para agências e equipes'],
+        name: 'Plano Studio',
+        price: 'R$99/mês (ou R$990/ano)',
+        credits: 250,
+        maxVideoDuration: 180,
+        features: [
+            '250 créditos por mês',
+            'Tudo do Plano Pro',
+            'Vídeos de até 180 segundos',
+            'Geração de mangá e storyboards',
+            'Suporte prioritário',
+            'Planejador de Conteúdo com IA',
+        ],
     },
+    associado: {
+        name: 'Plano Associado',
+        price: 'R$197/mês (Incluso no Pacote)',
+        credits: 600,
+        maxVideoDuration: 300,
+        features: [
+            '600 créditos por mês',
+            'Tudo do Plano Studio',
+            'Planejador de Conteúdo com IA',
+            'Geração de vídeos longos (até 5 min)',
+            'Funcionalidades beta exclusivas',
+        ],
+    },
+};
+
+export const FORMAT_CONFIGS: { [key: string]: any } = {
+    // Instagram
+    'Feed': { aspectRatio: '1:1', isMultiQuantity: false, isVideo: false },
+    'Stories': { aspectRatio: '9:16', isMultiQuantity: false, isVideo: false },
+    'Reel': { aspectRatio: '9:16', isVideo: true, maxDuration: 90 },
+    'Carrossel': { aspectRatio: '1:1', isMultiQuantity: true, maxQuantity: 10, isVideo: false },
+    // TikTok
+    'Vídeo/Post': { aspectRatio: '9:16', isVideo: true, maxDuration: 180 },
+    // YouTube
+    'Shorts': { aspectRatio: '9:16', isVideo: true, maxDuration: 60 },
+    'Vídeo': { aspectRatio: '16:9', isVideo: true, maxDuration: 300 },
+    // Manga
+    'Revista': { aspectRatio: '3:4', isMultiQuantity: true, maxQuantity: 20, isVideo: false }, // Pages
+    'Vídeo Animado': { aspectRatio: '16:9', isVideo: true, maxDuration: 180 },
 };

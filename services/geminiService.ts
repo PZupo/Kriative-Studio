@@ -1,11 +1,16 @@
-import { GoogleGenAI, Type, Modality } from "@google/genai";
-import type { Selections, GeneratedContent } from '../types';
-import { FORMAT_CONFIGS, FormatConfig } from '../constants';
+// FIX: Added a check to ensure the API key is defined, providing a clear error message to the developer if it's missing.
+const API_KEY = process.env.API_KEY;
+if (!API_KEY) {
+    throw new Error("API_KEY não encontrada. Por favor, crie um arquivo .env na raiz do projeto e adicione a linha: API_KEY=SUA_CHAVE_DE_API_AQUI");
+}
 
-// Initialize the Google AI client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { GoogleGenAI, Modality, Type } from "@google/genai";
+import type { Selections, GeneratedContent, MangaPanel, AIPlan } from '../types';
+import { FORMAT_CONFIGS, VIDEO_FORMATS } from "../constants";
 
-// Helper to convert File to a GoogleGenerativeAI.Part object
+const ai = new GoogleGenAI({ apiKey: API_KEY });
+
+
 const fileToGenerativePart = async (file: File) => {
     const base64EncodedDataPromise = new Promise<string>((resolve) => {
         const reader = new FileReader();
@@ -17,334 +22,289 @@ const fileToGenerativePart = async (file: File) => {
     };
 };
 
-const getAspectRatioDescription = (aspectRatio: string, isVideo: boolean = false): string => {
-    const type = isVideo ? 'vídeo' : 'imagem';
-    switch (aspectRatio) {
-        case '9:16':
-            return `um ${type} vertical (proporção 9:16), ideal para celular`;
-        case '3:4':
-        case '4:5':
-            return `um ${type} vertical (proporção ${aspectRatio})`;
-        case '16:9':
-            return `um ${type} horizontal (proporção 16:9), widescreen`;
-        case '1:1':
-            return `um ${type} quadrado (proporção 1:1)`;
-        default:
-            return `um ${type} com proporção ${aspectRatio}`;
-    }
-};
-
-
-// --- Main Content Generation Logic ---
-const generateContent = async (selections: Selections): Promise<GeneratedContent> => {
-    console.log("Calling real AI content generation with selections:", selections);
-    
-    const formatConfig = selections.format ? FORMAT_CONFIGS[selections.format] : null;
-    if (!formatConfig) {
-        throw new Error(`Configuration for format "${selections.format}" not found.`);
-    }
-
-    // Branching logic based on selection type
-    if (formatConfig.isVideo) {
-        return generateVideoContent(selections, formatConfig);
-    }
-    if (selections.style === 'Estilo Mangá') {
-        return generateMangaContent(selections, formatConfig);
-    }
-    if (selections.inputType === 'Prompt de Imagem' && selections.imagePrompt) {
-        return generateEditedImageContent(selections, formatConfig);
-    }
-    return generateStandardImageContent(selections, formatConfig);
-};
-
-// --- Specialized Generation Functions ---
-
-// 1. Video Generation (VEO)
-const generateVideoContent = async (selections: Selections, formatConfig: FormatConfig): Promise<GeneratedContent> => {
-    console.log("Calling VEO API for video generation...");
-    const requestedDuration = selections.duration || formatConfig.maxDuration;
-    const aspectRatioDesc = getAspectRatioDescription(formatConfig.aspectRatio, true);
-
-    const prompt = `Crie um vídeo profissional para ${selections.platform}, formato ${selections.format}. O vídeo DEVE ser ${aspectRatioDesc}. O vídeo DEVE OBRIGATORIAMENTE incluir uma trilha sonora de fundo vibrante e apropriada ao tema. O áudio é um requisito essencial. Duração aproximada de ${requestedDuration} segundos. O estilo visual é ${selections.visualStyle}. Ideia principal: "${selections.prompt}"`;
-
-    const imagePart = selections.imagePrompt ? await fileToGenerativePart(selections.imagePrompt) : undefined;
-    const image = imagePart ? { imageBytes: imagePart.inlineData.data, mimeType: imagePart.inlineData.mimeType } : undefined;
-
-    let operation = await ai.models.generateVideos({
-        model: 'veo-2.0-generate-001',
-        prompt: prompt,
-        image: image,
-        config: { numberOfVideos: 1 }
-    });
-
-    while (!operation.done) {
-        await new Promise(resolve => setTimeout(resolve, 10000)); // Poll every 10 seconds
-        operation = await ai.operations.getVideosOperation({ operation: operation });
-    }
-
-    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-    if (!downloadLink) {
-        throw new Error("Video generation failed, no download link returned.");
-    }
-    
-    const videoUrl = `${downloadLink}&key=${process.env.API_KEY}`;
-    
-    const textResponse = await generateCopyAndHashtags(selections);
-
+const base64ToGenerativePart = (base64: string, mimeType: string = 'image/png') => {
+    const data = base64.startsWith('data:') ? base64.split(',')[1] : base64;
     return {
-        images: [],
-        copy: textResponse.copy,
-        hashtags: textResponse.hashtags,
-        videoUrl: videoUrl,
-        duration: requestedDuration,
+        inlineData: { data, mimeType }
     };
 };
 
-// 2. Manga Generation (Gemini for text, Imagen for panels)
-const generateMangaContent = async (selections: Selections, formatConfig: FormatConfig): Promise<GeneratedContent> => {
-    console.log("Generating manga content...");
+// FIX: Added a robust JSON parsing function to handle potential markdown fences and whitespace from the API response.
+const parseJsonResponse = (responseText: string) => {
+    try {
+        const cleanJsonString = responseText.replace(/^```json\s*|```\s*$/g, '').trim();
+        return JSON.parse(cleanJsonString);
+    } catch (e) {
+        console.error("Failed to parse JSON from response:", responseText);
+        throw new Error("A IA retornou uma resposta de texto inválida.");
+    }
+};
+
+
+class GeminiService {
+    async generateContent(selections: Selections): Promise<GeneratedContent> {
+        if (selections.style === 'Estilo Mangá') {
+            return this.generateManga(selections);
+        }
+        if (selections.format && VIDEO_FORMATS.includes(selections.format)) {
+            return this.generateVideo(selections);
+        }
+        return this.generateImagePost(selections);
+    }
+
+    private async generateImagePost(selections: Selections): Promise<GeneratedContent> {
+        const { prompt, visualStyle, format, quantity, platform } = selections;
+        const formatConfig = format ? FORMAT_CONFIGS[format] : { aspectRatio: '1:1' };
+
+        const textPrompt = `
+            Você é um especialista em marketing de mídia social. Crie um post para ${platform}.
+            O post deve ser sobre: "${prompt}".
+            O estilo visual é: ${visualStyle}.
+            O formato da imagem deve ser com a proporção ${formatConfig.aspectRatio}.
+
+            Sua resposta DEVE ser um JSON com a seguinte estrutura:
+            {
+                "copy": "Um texto criativo e engajador para a legenda do post, com emojis relevantes. Use no máximo 200 caracteres.",
+                "hashtags": "Uma string com 5 a 7 hashtags relevantes, separadas por espaços."
+            }
+        `;
+
+        const imageGenerationPrompt = `
+            Crie uma imagem com a proporção de ${formatConfig.aspectRatio} para um post sobre "${prompt}".
+            O estilo visual deve ser: ${visualStyle}.
+            A imagem deve ser de alta qualidade, fotorealista e impactante.
+        `;
+
+        const textPromise = ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: textPrompt,
+            config: { responseMimeType: 'application/json' }
+        });
+        
+        const imagePromises = [];
+        for (let i = 0; i < quantity; i++) {
+            imagePromises.push(
+                ai.models.generateImages({
+                    model: 'imagen-4.0-generate-001',
+                    prompt: imageGenerationPrompt,
+                    config: {
+                        numberOfImages: 1,
+                        aspectRatio: formatConfig.aspectRatio,
+                        outputMimeType: 'image/png',
+                    }
+                })
+            );
+        }
+
+        const [textResponse, ...imageResponses] = await Promise.all([textPromise, ...imagePromises]);
+        
+        const textResult = parseJsonResponse(textResponse.text);
+        const images = imageResponses.map(res => {
+            const base64ImageBytes: string = res.generatedImages[0].image.imageBytes;
+            return `data:image/png;base64,${base64ImageBytes}`;
+        });
+
+        return {
+            images,
+            copy: textResult.copy,
+            hashtags: textResult.hashtags,
+        };
+    }
     
-    const storyResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: `Create a manga storyboard with ${selections.quantity} pages. The story is about: "${selections.prompt}". For each page, create 3 to 5 panels. Each panel needs a detailed visual 'description' and a short 'dialogue' text. The description should be a prompt for an image generation model.`,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    pages: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                panels: {
-                                    type: Type.ARRAY,
-                                    items: {
-                                        type: Type.OBJECT,
-                                        properties: {
-                                            description: { type: Type.STRING },
-                                            dialogue: { type: Type.STRING },
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        },
-    });
+    private async generateVideo(selections: Selections): Promise<GeneratedContent> {
+        const { prompt, visualStyle, platform, duration, imagePrompt } = selections;
 
-    const storyData = JSON.parse(storyResponse.text);
-    const storyboards: GeneratedContent['storyboards'] = [];
+        const textPrompt = `
+            Você é um roteirista de vídeos curtos para ${platform}. Crie um roteiro e uma legenda para um vídeo de ${duration} segundos.
+            O vídeo é sobre: "${prompt}".
+            O estilo visual é: ${visualStyle}.
+            
+            Sua resposta DEVE ser um JSON com a seguinte estrutura:
+            {
+                "copy": "Um texto criativo e engajador para a legenda do post, com emojis. Máximo 200 caracteres.",
+                "hashtags": "Uma string com 5 a 7 hashtags relevantes, separadas por espaços."
+            }
+        `;
+        
+        const videoPrompt = `Um vídeo cinematográfico de ${duration} segundos sobre: ${prompt}. Estilo: ${visualStyle}.`;
+        
+        const textPromise = ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: textPrompt,
+            config: { responseMimeType: 'application/json' }
+        });
+        
+        const videoRequest: any = {
+            model: 'veo-2.0-generate-001',
+            prompt: videoPrompt,
+            config: { numberOfVideos: 1 }
+        };
 
-    for (const page of storyData.pages) {
-        const pagePanels: { image: string, text: string }[] = [];
-        for (const panel of page.panels) {
-            const imageResponse = await ai.models.generateImages({
+        if (imagePrompt) {
+            const part = await fileToGenerativePart(imagePrompt);
+            videoRequest.image = {
+                imageBytes: part.inlineData.data,
+                mimeType: part.inlineData.mimeType,
+            };
+        }
+
+        let operation = await ai.models.generateVideos(videoRequest);
+        while (!operation.done) {
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            operation = await ai.operations.getVideosOperation({ operation: operation });
+        }
+        
+        const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+        if (!downloadLink) throw new Error("Video generation failed to produce a download link.");
+        
+        const textResponse = await textPromise;
+        
+        const textResult = parseJsonResponse(textResponse.text);
+        return {
+            images: [],
+            videoUrl: downloadLink,
+            duration,
+            copy: textResult.copy,
+            hashtags: textResult.hashtags,
+        };
+    }
+
+    private async generateManga(selections: Selections): Promise<GeneratedContent> {
+        const { prompt, visualStyle, quantity, platform } = selections;
+        
+        const storyPrompt = `
+            Você é um mangaká (criador de mangá). Crie uma história curta para uma revista de ${quantity} páginas para a plataforma ${platform}.
+            O tema da história é: "${prompt}".
+            O estilo visual é ${visualStyle}, mas adaptado para um formato de mangá/quadrinhos.
+            Para cada página, descreva 2 painéis (imagens) que contam a história visualmente.
+            Para cada painel, inclua um texto curto (diálogo ou narração).
+            Sua resposta DEVE ser um JSON com a seguinte estrutura:
+            {
+                "copy": "Um texto de introdução para o post da revista.",
+                "hashtags": "Uma string com 5 hashtags sobre mangá e o tema.",
+                "pages": [
+                    {
+                        "page": 1,
+                        "panels": [
+                            {"image_description": "Descrição detalhada da imagem para o painel 1", "text": "Texto para o painel 1"},
+                            {"image_description": "Descrição detalhada da imagem para o painel 2", "text": "Texto para o painel 2"}
+                        ]
+                    }
+                ]
+            }
+        `;
+
+        const storyResponse = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: storyPrompt,
+            config: { responseMimeType: 'application/json' },
+        });
+        
+        const story = parseJsonResponse(storyResponse.text);
+        const allPanelDescriptions = story.pages.flatMap((p: any) => p.panels.map((panel: any) => panel.image_description));
+        
+        const imagePromises = allPanelDescriptions.map((desc: string) => 
+            ai.models.generateImages({
                 model: 'imagen-4.0-generate-001',
-                prompt: `black and white manga panel, dramatic shading, ${panel.description}`,
+                prompt: `${desc}, estilo de mangá preto e branco, ${visualStyle}`,
                 config: {
                     numberOfImages: 1,
-                    aspectRatio: formatConfig.aspectRatio,
-                    outputMimeType: 'image/png',
-                },
-            });
+                    aspectRatio: '3:4',
+                    outputMimeType: 'image/png'
+                }
+            })
+        );
+        
+        const imageResponses = await Promise.all(imagePromises);
+        const generatedImages = imageResponses.map(res => `data:image/png;base64,${res.generatedImages[0].image.imageBytes}`);
 
-            if (imageResponse.generatedImages && imageResponse.generatedImages.length > 0) {
-                const base64ImageBytes = imageResponse.generatedImages[0].image.imageBytes;
-                const imageUrl = `data:image/png;base64,${base64ImageBytes}`;
-                pagePanels.push({ image: imageUrl, text: panel.dialogue });
-            }
-        }
-        storyboards.push(pagePanels);
-    }
-    
-    const textResponse = await generateCopyAndHashtags(selections);
+        let imageCounter = 0;
+        const storyboards: MangaPanel[][] = story.pages.map((page: any) => {
+            return page.panels.map((panel: any) => ({
+                image: generatedImages[imageCounter++],
+                text: panel.text,
+            }));
+        });
 
-    return {
-        images: [],
-        copy: textResponse.copy,
-        hashtags: textResponse.hashtags,
-        storyboards: storyboards
-    };
-};
-
-// 3. Image Editing (Gemini Nano Banana)
-const generateEditedImageContent = async (selections: Selections, formatConfig: FormatConfig): Promise<GeneratedContent> => {
-    console.log("Calling Gemini for image editing...");
-    const imagePart = await fileToGenerativePart(selections.imagePrompt!);
-    
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image-preview',
-        contents: {
-            parts: [
-                imagePart,
-                { text: `Edit this image based on the following prompt, maintaining a professional quality. Prompt: "${selections.prompt}"` },
-            ],
-        },
-        config: {
-            responseModalities: [Modality.IMAGE, Modality.TEXT],
-        },
-    });
-
-    let imageUrl = '';
-    let copy = `Here is the edited image based on your prompt: "${selections.prompt.substring(0, 50)}...".`;
-    
-    if (response.candidates && response.candidates.length > 0) {
-        for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData) {
-                const base64ImageBytes: string = part.inlineData.data;
-                imageUrl = `data:image/png;base64,${base64ImageBytes}`;
-            } else if (part.text) {
-                copy = part.text;
-            }
-        }
-    }
-
-    if (!imageUrl) {
-        throw new Error("Image editing failed to return an image.");
-    }
-    
-    const textResponse = await generateCopyAndHashtags(selections);
-
-    return {
-        images: [imageUrl],
-        copy: copy,
-        hashtags: textResponse.hashtags,
-    };
-};
-
-// 4. Standard Text-to-Image (Imagen)
-const generateStandardImageContent = async (selections: Selections, formatConfig: FormatConfig): Promise<GeneratedContent> => {
-    console.log("Calling Imagen for text-to-image generation...");
-    
-    const aspectRatioDesc = getAspectRatioDescription(formatConfig.aspectRatio);
-
-    const imageResponse = await ai.models.generateImages({
-        model: 'imagen-4.0-generate-001',
-        prompt: `Create a high-quality image for ${selections.platform}. It MUST be ${aspectRatioDesc}. Visual Style: ${selections.visualStyle}. The idea is: "${selections.prompt}"`,
-        config: {
-            numberOfImages: selections.quantity,
-            aspectRatio: formatConfig.aspectRatio,
-            outputMimeType: 'image/png',
-        },
-    });
-
-    const generatedImages = imageResponse.generatedImages.map(img => {
-        const base64ImageBytes = img.image.imageBytes;
-        return `data:image/png;base64,${base64ImageBytes}`;
-    });
-
-    if (generatedImages.length === 0) {
-        throw new Error("Image generation failed to return any images.");
-    }
-
-    const textResponse = await generateCopyAndHashtags(selections);
-
-    return {
-        images: generatedImages,
-        copy: textResponse.copy,
-        hashtags: textResponse.hashtags,
-    };
-};
-
-
-// --- Text Generation Helpers ---
-const generateCopyAndHashtags = async (selections: Selections): Promise<{ copy: string, hashtags: string }> => {
-    const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: `Generate a compelling social media copy and a list of relevant hashtags for the following concept. The platform is ${selections.platform}. The concept is: "${selections.prompt}". Return the response as a JSON object with two keys: "copy" and "hashtags". Hashtags should be a single string.`,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    copy: { type: Type.STRING },
-                    hashtags: { type: Type.STRING },
-                },
-            },
-        },
-    });
-
-    try {
-        const result = JSON.parse(response.text);
         return {
-            copy: result.copy || "Failed to generate copy.",
-            hashtags: result.hashtags || "#error",
-        };
-    } catch (e) {
-        console.error("Failed to parse JSON for copy/hashtags", e);
-        return {
-            copy: "Our AI created this amazing content for you! ✨",
-            hashtags: "#kriativestudio #ai #generatedcontent"
+            images: [],
+            copy: story.copy,
+            hashtags: story.hashtags,
+            storyboards,
         };
     }
-};
 
-const generateProfessionalPrompt = async (selections: Selections): Promise<string> => {
-    try {
+    async generateProfessionalPrompt(selections: Selections): Promise<string> {
+        const { prompt, platform, format, visualStyle } = selections;
+        const request = `
+          Você é um especialista em engenharia de prompt para IAs generativas de imagem.
+          Melhore o seguinte prompt de usuário para gerar um conteúdo visualmente incrível.
+          Adicione detalhes sobre composição, iluminação, cores e atmosfera.
+          O conteúdo é para a plataforma ${platform}, no formato ${format}, com estilo visual ${visualStyle}.
+          
+          Prompt do usuário: "${prompt}"
+
+          Retorne APENAS o prompt melhorado, sem nenhuma outra formatação ou texto.
+        `;
+
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: `You are a professional prompt engineer for AI image generators. Based on the user's simple idea, create a detailed, vivid, and artistic prompt.
-            - User's Idea: "${selections.prompt}"
-            - Target Platform: ${selections.platform}
-            - Desired Visual Style: ${selections.visualStyle || 'any'}
-            Generate only the prompt text, without any preamble.`,
+            contents: request,
         });
+
         return response.text.trim();
-    } catch (error) {
-        console.error("Error generating professional prompt:", error);
-        return `Error generating prompt. Original idea: ${selections.prompt}`;
     }
-};
+    
+    async editImage(base64ImageUrl: string, prompt: string): Promise<string> {
+        const imagePart = base64ToGenerativePart(base64ImageUrl);
+        const textPart = { text: prompt };
 
-const editImage = async (imageUrl: string, prompt: string): Promise<string> => {
-    console.log("Calling Gemini for in-app image editing...");
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image-preview',
+            contents: {
+                parts: [imagePart, textPart],
+            },
+            config: {
+                responseModalities: [Modality.IMAGE, Modality.TEXT],
+            },
+        });
 
-    const base64Data = imageUrl.split(',')[1];
-    if (!base64Data) {
-        throw new Error("Invalid image URL format for editing.");
-    }
-    const mimeType = imageUrl.match(/data:(.*);base64,/)?.[1] || 'image/png';
+        const imagePartResponse = response.candidates?.[0]?.content?.parts.find(part => part.inlineData);
 
-    const imagePart = {
-        inlineData: { data: base64Data, mimeType },
-    };
-
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image-preview',
-        contents: {
-            parts: [
-                imagePart,
-                { text: `Apply this edit to the image: "${prompt}". Respond only with the modified image.` },
-            ],
-        },
-        config: {
-            responseModalities: [Modality.IMAGE],
-        },
-    });
-
-    let newImageUrl = '';
-    if (response.candidates && response.candidates.length > 0) {
-        const imagePart = response.candidates[0].content.parts.find(part => part.inlineData);
-        if (imagePart && imagePart.inlineData) {
-            const base64ImageBytes: string = imagePart.inlineData.data;
-            const newMimeType = imagePart.inlineData.mimeType || 'image/png';
-            newImageUrl = `data:${newMimeType};base64,${base64ImageBytes}`;
+        if (!imagePartResponse || !imagePartResponse.inlineData) {
+            throw new Error("A IA não retornou uma imagem editada.");
         }
+
+        const base64ImageBytes: string = imagePartResponse.inlineData.data;
+        return `data:${imagePartResponse.inlineData.mimeType};base64,${base64ImageBytes}`;
     }
 
-    if (!newImageUrl) {
-        throw new Error("Image editing failed to produce a new image.");
+    async getAIContentPlan(topic: string): Promise<AIPlan> {
+        const prompt = `
+            Você é um estrategista de mídias sociais. Crie um plano de conteúdo para o nicho de "${topic}".
+            O plano deve incluir:
+            1. Uma lista de 5 temas de conteúdo criativos e engajadores.
+            2. Uma sugestão de melhores horários para postar para Instagram, TikTok e YouTube.
+
+            Sua resposta DEVE ser um JSON com a seguinte estrutura:
+            {
+                "themes": ["Tema 1", "Tema 2", "Tema 3", "Tema 4", "Tema 5"],
+                "schedule": {
+                    "Instagram": ["Segunda-feira, 11:00", "Quarta-feira, 14:00"],
+                    "TikTok": ["Terça-feira, 19:00", "Sexta-feira, 20:00"],
+                    "YouTube": ["Sábado, 12:00"]
+                }
+            }
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: { responseMimeType: 'application/json' },
+        });
+        
+        return parseJsonResponse(response.text);
     }
+}
 
-    return newImageUrl;
-};
-
-
-export const geminiService = {
-    generateContent,
-    generateProfessionalPrompt,
-    editImage
-};
+export const geminiService = new GeminiService();

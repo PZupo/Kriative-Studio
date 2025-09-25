@@ -1,139 +1,210 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import Button from './common/Button';
+import { useNotification } from '../contexts/NotificationContext';
+import { PlanKey } from '../types';
 import { PLAN_CONFIGS } from '../constants';
+import Button from './common/Button';
+import ForgotPasswordModal from './ForgotPasswordModal';
 
-type PlanKey = keyof typeof PLAN_CONFIGS;
+type AuthView = 'login' | 'register_plans' | 'register_details';
 
 const AuthScreen: React.FC = () => {
+    const [view, setView] = useState<AuthView>('login');
+    
+    // Form state
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [selectedPlan, setSelectedPlan] = useState<PlanKey>('pro');
-    const [isAssociadoInvite, setIsAssociadoInvite] = useState(false);
-    const { login } = useAuth();
+    const [selectedPlan, setSelectedPlan] = useState<PlanKey | null>(null);
+    
+    const [isLoading, setIsLoading] = useState(false);
+    const [isForgotPassOpen, setForgotPassOpen] = useState(false);
+    
+    const { login, signup, loginWithGoogle } = useAuth();
+    const { showToast } = useNotification();
 
-    useEffect(() => {
-        // Check for the special invitation link on component mount
-        const urlParams = new URLSearchParams(window.location.search);
-        const planFromUrl = urlParams.get('plan');
-        if (planFromUrl === 'associado') {
-            setIsAssociadoInvite(true);
-            setSelectedPlan('associado');
-        }
-    }, []);
-
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!email || !password || !name) {
-            alert('Por favor, preencha todos os campos.');
-            return;
+        setIsLoading(true);
+        try {
+            await login(email, password);
+            // O listener do AuthContext irá lidar com o sucesso
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "E-mail ou senha inválidos.";
+            showToast(errorMessage, 'error');
+        } finally {
+            setIsLoading(false);
         }
-        login(name, email, selectedPlan);
     };
 
-    const inputClasses = "mt-1 block w-full py-2 px-3 bg-white border border-gray-300 rounded-md shadow-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ff8c00]";
+    const handleGoogleLogin = async () => {
+        try {
+            await loginWithGoogle();
+            // O Supabase irá redirecionar para o Google e, na volta,
+            // o listener do AuthContext irá capturar a sessão.
+        } catch (error) {
+             const errorMessage = error instanceof Error ? error.message : "Falha no login com Google.";
+            showToast(errorMessage, 'error');
+        }
+    };
 
-    // View for the general public, showing all plans
-    const PublicPricingView = () => (
-        <>
-            <div className="text-center mb-8">
-                <i className="fa-solid fa-palette text-5xl text-[#008080]"></i>
-                <h1 className="text-4xl font-bold text-gray-800 mt-4">Bem-vindo ao Kriative Social Studio</h1>
-                <p className="text-gray-500 text-lg">Escolha o plano perfeito para decolar sua criação de conteúdo.</p>
-            </div>
-            
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
-                <PlanCard planKey="pro" />
-                <PlanCard planKey="studio" />
-                <PlanCard planKey="associado" />
-            </div>
+    const handlePlanSelect = (plan: PlanKey) => {
+        setSelectedPlan(plan);
+        setView('register_details');
+    };
 
-            <div className="max-w-md mx-auto">
-                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Nome</label>
-                            <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClasses} placeholder="Seu nome" required />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Email</label>
-                            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClasses} placeholder="voce@exemplo.com" required />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Senha</label>
-                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClasses} placeholder="••••••••" required />
-                    </div>
-                    <Button type="submit" className="w-full text-lg">
-                        Criar Conta e Assinar Plano {PLAN_CONFIGS[selectedPlan].name}
-                    </Button>
-                </form>
+    const handleRegister = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedPlan) {
+            showToast('Ocorreu um erro, por favor selecione o plano novamente.', 'error');
+            setView('register_plans');
+            return;
+        }
+        setIsLoading(true);
+        try {
+            await signup(name, email, password, selectedPlan);
+             // O listener do AuthContext irá lidar com o sucesso
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "Falha ao criar a conta.";
+            showToast(errorMessage, 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    const renderLogin = () => (
+        <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+                <label className="block text-sm font-medium text-gray-700">Email</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="mt-1 w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008080]" />
             </div>
-        </>
+            <div>
+                <label className="block text-sm font-medium text-gray-700">Senha</label>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="mt-1 w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008080]" />
+            </div>
+            <div className="pt-4">
+                <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Entrar'}</Button>
+            </div>
+        </form>
     );
 
-    // Simplified view for members coming from the invitation link
-    const AssociadoWelcomeView = () => (
-        <div className="max-w-md mx-auto">
-            <div className="text-center mb-8">
-                <i className="fa-solid fa-star text-5xl text-yellow-400"></i>
-                <h1 className="text-4xl font-bold text-gray-800 mt-4">Bem-vindo, Associado!</h1>
-                <p className="text-gray-500 text-lg">Seu acesso ao Kriative Social Studio está pronto. Crie sua conta para começar.</p>
-            </div>
-            <div className="p-4 bg-teal-50 border border-teal-200 rounded-lg text-center mb-6">
-                <p className="font-bold text-teal-800">Plano Associado Ativado</p>
-            </div>
-             <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Nome Completo</label>
-                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClasses} placeholder="Seu nome" required />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Seu Melhor Email</label>
-                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClasses} placeholder="voce@exemplo.com" required />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Crie uma Senha</label>
-                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClasses} placeholder="••••••••" required />
-                </div>
-                <Button type="submit" className="w-full text-lg">
-                    Acessar o Studio
-                </Button>
-            </form>
+    const renderPlanSelection = () => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {(Object.keys(PLAN_CONFIGS) as PlanKey[]).map(planKey => {
+                const plan = PLAN_CONFIGS[planKey];
+                return (
+                    <button
+                        key={planKey}
+                        onClick={() => handlePlanSelect(planKey)}
+                        className="p-6 rounded-lg border-2 border-gray-200 bg-white hover:border-teal-500 hover:shadow-xl transition-all flex flex-col text-left h-full group"
+                    >
+                        <h3 className="text-xl font-bold text-gray-800">{plan.name}</h3>
+                        <p className="text-gray-500 text-sm mb-4">{planKey === 'associado' ? 'Parte do pacote de marketing' : 'Assinatura Individual'}</p>
+                        <p className="text-2xl font-extrabold text-gray-900 mb-4">{plan.price.split('(')[0]}</p>
+                        <ul className="space-y-2 text-sm text-gray-600 mb-6">
+                            {plan.features.map(feature => (
+                                <li key={feature} className="flex items-start">
+                                    <i className="fa-solid fa-check-circle text-green-500 mr-2 mt-1 shrink-0"></i>
+                                    <span>{feature}</span>
+                                </li>
+                            ))}
+                        </ul>
+                        <div className="mt-auto">
+                            <span className="block w-full text-center bg-[#ff8c00] text-white font-bold py-3 rounded-lg shadow-md group-hover:bg-[#cc7000] transition-colors">
+                                Escolher Plano
+                            </span>
+                        </div>
+                    </button>
+                );
+            })}
         </div>
     );
     
-    // Helper component for the public view
-    const PlanCard: React.FC<{ planKey: PlanKey }> = ({ planKey }) => {
-        const plan = PLAN_CONFIGS[planKey];
-        const isSelected = selectedPlan === planKey;
-        return (
-            <div
-                onClick={() => setSelectedPlan(planKey)}
-                className={`p-6 rounded-xl border-2 cursor-pointer transition-all duration-300 transform ${isSelected ? 'bg-teal-50 border-teal-500 scale-105 shadow-2xl' : 'bg-white border-gray-200 hover:shadow-lg hover:border-teal-300'}`}
-            >
-                <h3 className={`text-2xl font-bold ${isSelected ? 'text-teal-700' : 'text-gray-800'}`}>{plan.name}</h3>
-                <p className="text-gray-500 text-sm mb-4">{planKey === 'associado' ? 'Parte do pacote de marketing' : 'Assinatura Individual'}</p>
-                <p className="text-3xl font-extrabold text-gray-900 mb-4">{plan.price.split('(')[0]}</p>
-                <ul className="space-y-2 text-gray-600">
-                    {plan.features.map(feature => (
-                        <li key={feature} className="flex items-center">
-                            <i className="fa-solid fa-check-circle text-green-500 mr-2"></i>
-                            {feature}
-                        </li>
-                    ))}
-                </ul>
+    const renderRegisterDetails = () => (
+        <form onSubmit={handleRegister} className="space-y-4">
+             <div className="p-3 bg-teal-50 border border-teal-200 rounded-lg text-center">
+                <p className="font-semibold text-teal-800">Plano Selecionado: {PLAN_CONFIGS[selectedPlan!].name}</p>
+                <button type="button" onClick={() => setView('register_plans')} className="text-xs text-teal-600 hover:underline">Trocar plano</button>
             </div>
-        );
+            <div>
+                <label className="block text-sm font-medium text-gray-700">Nome</label>
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} required className="mt-1 w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008080]" />
+            </div>
+             <div>
+                <label className="block text-sm font-medium text-gray-700">Email</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="mt-1 w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008080]" />
+            </div>
+            <div>
+                <label className="block text-sm font-medium text-gray-700">Senha</label>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="mt-1 w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008080]" />
+            </div>
+             <div className="pt-4">
+                <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Criar Conta e Continuar'}</Button>
+            </div>
+        </form>
+    );
+
+    const titles: Record<AuthView, string> = {
+        login: 'Bem-vindo de volta!',
+        register_plans: 'Escolha o plano perfeito para você',
+        register_details: 'Complete seus dados para começar'
     };
+    
+    const containerWidth = view === 'register_plans' ? 'max-w-5xl' : 'max-w-md';
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#f5f5dc] p-4">
-            <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl p-8 border border-gray-200">
-                {isAssociadoInvite ? <AssociadoWelcomeView /> : <PublicPricingView />}
+        <>
+            <div className="min-h-screen bg-[#f5f5dc] flex items-center justify-center p-4">
+                <div className={`w-full ${containerWidth} bg-white rounded-2xl shadow-xl p-8 animate-fade-in transition-all duration-300`}>
+                    <div className="text-center mb-8">
+                        <h1 className="text-3xl font-bold text-[#008080]">Kriative<span className="text-[#ff8c00]">Studio</span></h1>
+                        <p className="text-gray-500 mt-2">{titles[view]}</p>
+                    </div>
+
+                    {view === 'login' && renderLogin()}
+                    {view === 'register_plans' && renderPlanSelection()}
+                    {view === 'register_details' && renderRegisterDetails()}
+
+                    {view !== 'register_plans' && (
+                        <>
+                            <div className="relative my-6 text-center">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-gray-300"></div>
+                                </div>
+                                <div className="relative flex justify-center text-sm">
+                                    <span className="px-2 bg-white text-gray-500">OU</span>
+                                </div>
+                            </div>
+
+                            <Button variant="secondary" className="w-full" onClick={handleGoogleLogin} disabled={isLoading}>
+                                <i className="fa-brands fa-google mr-2"></i> Entrar com Google
+                            </Button>
+                        </>
+                    )}
+
+
+                    <div className="mt-6 text-center">
+                        {view === 'login' ? (
+                             <p className="text-sm text-gray-600">
+                                Não tem uma conta?{' '}
+                                <button onClick={() => setView('register_plans')} className="font-semibold text-[#008080] hover:underline">Cadastre-se</button>
+                            </p>
+                        ) : (
+                             <p className="text-sm text-gray-600">
+                                Já tem uma conta?{' '}
+                                <button onClick={() => setView('login')} className="font-semibold text-[#008080] hover:underline">Faça login</button>
+                            </p>
+                        )}
+                        {view === 'login' && (
+                            <button onClick={() => setForgotPassOpen(true)} className="block mx-auto mt-2 text-xs text-gray-500 hover:underline">
+                                Esqueceu a senha?
+                            </button>
+                        )}
+                    </div>
+                </div>
             </div>
-        </div>
+            <ForgotPasswordModal isOpen={isForgotPassOpen} onClose={() => setForgotPassOpen(false)} />
+        </>
     );
 };
 
