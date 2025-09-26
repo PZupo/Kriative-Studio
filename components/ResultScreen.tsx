@@ -4,9 +4,13 @@ import React, { useState, TouchEvent, useEffect } from 'react';
 // FIX: Corrected import paths to use '../' for parent directories.
 import type { GeneratedContent, Selections, SavedContentItem } from '../types';
 import Button from './common/Button';
+// FIX: Corrected import path to use '../' for parent directory.
 import { useNotification } from '../contexts/NotificationContext';
+// FIX: Corrected import path to use '../' for parent directory.
 import { FORMAT_CONFIGS } from '../constants';
+// FIX: Corrected import path to use '../' for parent directory.
 import { useAuth } from '../contexts/AuthContext';
+// FIX: Corrected import path to use '../' for parent directory.
 import { geminiService, API_KEY } from '../services/geminiService';
 import ImageEditModal from './ImageEditModal';
 

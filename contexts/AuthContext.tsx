@@ -1,116 +1,118 @@
-import React, { createContext, useState, useContext, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
-import type { User, PlanKey } from '../types';
-import { PLAN_CONFIGS } from '../constants';
+import { User } from '../types';
+import type { AuthChangeEvent, Session, User as SupabaseUser } from '@supabase/supabase-js';
 
 interface AuthContextType {
     user: User | null;
-    login: (email: string, password: string) => Promise<void>;
-    signup: (name: string, email: string, password: string, plan: PlanKey) => Promise<void>;
-    logout: () => Promise<void>;
-    loginWithGoogle: () => Promise<void>;
     updateUser: (updates: Partial<User>) => void;
+    logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
-
-    const fetchUserProfile = useCallback(async (userId: string, email?: string): Promise<User | null> => {
-        if (!isSupabaseConfigured) return null;
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('uid', userId)
-            .single();
-
-        if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-            console.error('Error fetching profile:', error);
-            return null;
-        }
-        if (data) {
-            return data as User;
-        }
-        // If profile doesn't exist, it might be a new sign-up
-        if (email) {
-            return {
-                uid: userId,
-                email,
-                name: email.split('@')[0], // Default name
-                plan: 'pro', // Default plan
-                credits: PLAN_CONFIGS.pro.credits,
-                mangaGenerations: 0,
-            };
-        }
-        return null;
-    }, []);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!isSupabaseConfigured) return;
+        if (!isSupabaseConfigured) {
+            setLoading(false);
+            return;
+        }
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (session?.user) {
-                const profile = await fetchUserProfile(session.user.id, session.user.email);
-                setUser(profile);
-            } else {
+        const fetchUserProfile = async (supabaseUser: SupabaseUser | null) => {
+            if (!supabaseUser) {
                 setUser(null);
+                setLoading(false);
+                return;
             }
-        });
+
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', supabaseUser.id)
+                    .single();
+                
+                if (error && error.code === 'PGRST116') { // "PGRST116" means no rows found
+                     console.log('No profile found for user, creating one.');
+                     const newUser: User = {
+                         uid: supabaseUser.id,
+                         email: supabaseUser.email || '',
+                         name: supabaseUser.user_metadata?.name || 'Novo Usuário',
+                         plan: 'pro',
+                         credits: 100, // Starting credits for pro plan
+                         mangaGenerations: 0,
+                     };
+                     const { error: insertError } = await supabase.from('profiles').insert({
+                         id: newUser.uid,
+                         email: newUser.email,
+                         name: newUser.name,
+                         plan: newUser.plan,
+                         credits: newUser.credits,
+                     });
+                     if (insertError) throw insertError;
+                     setUser(newUser);
+                } else if (error) {
+                    throw error;
+                } else if (data) {
+                    setUser({
+                        uid: data.id,
+                        name: data.name,
+                        email: data.email,
+                        plan: data.plan,
+                        credits: data.credits,
+                        mangaGenerations: data.manga_generations || 0,
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching or creating user profile:', error);
+                setUser(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        const getSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            await fetchUserProfile(session?.user ?? null);
+        };
+        
+        getSession();
+
+        const { data: authListener } = supabase.auth.onAuthStateChange(
+            async (event: AuthChangeEvent, session: Session | null) => {
+                await fetchUserProfile(session?.user ?? null);
+            }
+        );
 
         return () => {
-            subscription?.unsubscribe();
+            authListener.subscription.unsubscribe();
         };
-    }, [fetchUserProfile]);
+    }, []);
 
-    const login = async (email: string, password: string) => {
-        if (!isSupabaseConfigured) throw new Error("Supabase not configured");
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-    };
-    
-    const loginWithGoogle = async () => {
-        if (!isSupabaseConfigured) throw new Error("Supabase not configured");
-        const { error } = await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-                redirectTo: window.location.origin,
-            },
-        });
-        if (error) throw error;
-    };
-
-    const signup = async (name: string, email: string, password: string, plan: PlanKey) => {
-        if (!isSupabaseConfigured) throw new Error("Supabase not configured");
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    name: name,
-                },
-            },
-        });
-
-        if (authError) throw authError;
-        if (!authData.user) throw new Error("Signup successful but no user data returned.");
+    const updateUser = async (updates: Partial<User>) => {
+        if (!user) return;
         
-        const planConfig = PLAN_CONFIGS[plan];
-        const { error: profileError } = await supabase
-            .from('profiles')
-            .insert({
-                uid: authData.user.id,
-                name,
-                email,
-                plan,
-                credits: planConfig.credits,
-                mangaGenerations: 0,
-            });
+        const updatedUser = { ...user, ...updates };
+        setUser(updatedUser);
 
-        if (profileError) {
-             console.error("Error creating profile:", profileError);
-             // Potentially delete the auth user if profile creation fails to allow retry
-             throw new Error("Could not create user profile.");
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({
+                    name: updatedUser.name,
+                    plan: updatedUser.plan,
+                    credits: updatedUser.credits,
+                    manga_generations: updatedUser.mangaGenerations,
+                 })
+                .eq('id', user.uid);
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            // Optionally revert state
+            setUser(user);
         }
     };
 
@@ -120,22 +122,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(null);
     };
 
-    const updateUser = (updates: Partial<User>) => {
-        if (user) {
-            const updatedUser = { ...user, ...updates };
-            setUser(updatedUser);
-            // Optionally, persist to Supabase here if needed
-            // e.g., supabase.from('profiles').update(updates).eq('uid', user.uid)
-        }
+    const value = {
+        user,
+        updateUser,
+        logout,
     };
 
-    const value = { user, login, signup, logout, loginWithGoogle, updateUser };
+    // Prevent rendering children until auth state is determined
+    if (loading) {
+        return null;
+    }
 
-    return (
-        <AuthContext.Provider value={value}>
-            {children}
-        </AuthContext.Provider>
-    );
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = (): AuthContextType => {
