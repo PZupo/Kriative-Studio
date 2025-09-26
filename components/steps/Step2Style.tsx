@@ -19,7 +19,7 @@ const styleIcons: { [key: string]: string } = {
 const Step2Style: React.FC<Props> = ({ selections, onSelect, onNext, onBack }) => {
     return (
         <div className="flex flex-col items-center animate-fade-in">
-            <h2 className="text-2xl font-bold text-center mb-6">Qual estilo você prefere?</h2>
+            <h2 className="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-gray-200">Qual estilo você prefere?</h2>
             <div className="w-full max-w-sm space-y-4">
                 {STYLES.map(style => (
                     <SelectionButton

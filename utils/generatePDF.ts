@@ -3,6 +3,11 @@ import autoTable from 'jspdf-autotable';
 import { PLAN_CONFIGS } from '../constants';
 import { PlanKey } from '../types';
 
+// Adicionado alias de tipo para os estilos de fonte para satisfazer a tipagem estrita do jspdf-autotable.
+type FontStyle = 'normal' | 'bold' | 'italic' | 'bolditalic';
+// FIX: Added HAlignType to satisfy jspdf-autotable's strict typing for horizontal alignment.
+type HAlignType = 'left' | 'center' | 'right' | 'justify';
+
 // New data structure focusing on optimized credit usage and transparency.
 const usageSuggestions: { [key in PlanKey]: { title: string; items: { description: string; quantity: number; credits: number }[] }[] } = {
     associado: [
@@ -106,12 +111,14 @@ export const generateUsageSuggestionsPDF = () => {
             const head = [['Tipo de Conteúdo', 'Quantidade', 'Créditos Utilizados']];
             const body = suggestion.items.map(item => [item.description, item.quantity, item.credits]);
             const foot = [
-                [{ content: 'Total da Estratégia', colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } }, { content: totalCredits, styles: { fontStyle: 'bold' } }]
+                // FIX: Explicitly cast 'halign' to HAlignType to match jspdf-autotable's expected types.
+                [{ content: 'Total da Estratégia', colSpan: 2, styles: { halign: 'right' as HAlignType, fontStyle: 'bold' as FontStyle } }, { content: totalCredits, styles: { fontStyle: 'bold' as FontStyle } }]
             ];
 
             autoTable(doc, {
                 startY: startY,
-                head: [[{ content: suggestion.title, colSpan: 3, styles: { halign: 'center', fontStyle: 'bold', fillColor: '#008080' } }]],
+                // FIX: Explicitly cast 'halign' to HAlignType to match jspdf-autotable's expected types.
+                head: [[{ content: suggestion.title, colSpan: 3, styles: { halign: 'center' as HAlignType, fontStyle: 'bold' as FontStyle, fillColor: '#008080' } }]],
                 body,
                 foot,
                 theme: 'striped',

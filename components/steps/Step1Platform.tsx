@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { Selections } from '../../types';
 import { PLATFORMS } from '../../constants';
@@ -20,7 +19,7 @@ const platformIcons: { [key: string]: string } = {
 const Step1Platform: React.FC<Props> = ({ selections, onSelect, onNext }) => {
     return (
         <div className="flex flex-col items-center animate-fade-in">
-            <h2 className="text-2xl font-bold text-center mb-6">Para qual plataforma é o conteúdo?</h2>
+            <h2 className="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-gray-200">Para qual plataforma é o conteúdo?</h2>
             <div className="w-full max-w-sm space-y-4">
                 {PLATFORMS.map(platform => (
                     <SelectionButton

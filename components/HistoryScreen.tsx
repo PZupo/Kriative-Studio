@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { SavedContentItem } from '../types';
+// FIX: Import useAuth from AuthContext to resolve missing member error.
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import Button from './common/Button';
@@ -78,7 +79,7 @@ const HistoryScreen: React.FC<Props> = ({ onNavigate }) => {
         const savedDate = new Date(item.savedAt).toLocaleDateString('pt-BR');
 
         return (
-            <div key={item.id} className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col transition-transform duration-300 hover:scale-105 hover:shadow-xl">
+            <div key={item.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex flex-col transition-transform duration-300 hover:scale-105 hover:shadow-xl">
                 <div className="relative">
                     {item.content.videoUrl ? (
                          <div className="w-full h-48 bg-black flex items-center justify-center">
@@ -95,11 +96,11 @@ const HistoryScreen: React.FC<Props> = ({ onNavigate }) => {
                     )}
                 </div>
                 <div className="p-4 flex-grow flex flex-col">
-                    <h3 className="font-bold text-lg text-gray-800">{item.selections.format} para {item.selections.platform}</h3>
-                    <p className="text-sm text-gray-500">Salvo em: {savedDate}</p>
+                    <h3 className="font-bold text-lg text-gray-800 dark:text-gray-200">{item.selections.format} para {item.selections.platform}</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Salvo em: {savedDate}</p>
                     
                     {item.scheduledAt && (
-                        <p className="text-sm text-green-700 mt-2 font-semibold">
+                        <p className="text-sm text-green-700 dark:text-green-400 mt-2 font-semibold">
                            {new Date(item.scheduledAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                         </p>
                     )}
@@ -115,7 +116,7 @@ const HistoryScreen: React.FC<Props> = ({ onNavigate }) => {
                                 <i className="fa-solid fa-calendar-alt mr-2"></i>Agendar
                             </Button>
                          )}
-                         <button onClick={() => setItemToDelete(item)} className="text-gray-400 hover:text-red-500 p-2 rounded-full transition-colors">
+                         <button onClick={() => setItemToDelete(item)} className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 p-2 rounded-full transition-colors">
                             <i className="fa-solid fa-trash"></i>
                         </button>
                     </div>
@@ -127,19 +128,19 @@ const HistoryScreen: React.FC<Props> = ({ onNavigate }) => {
     return (
         <div className="max-w-6xl mx-auto animate-fade-in">
             <div className="flex justify-between items-center mb-8">
-                <h1 className="text-4xl font-extrabold text-[#008080]">Minhas Criações</h1>
+                <h1 className="text-4xl font-extrabold text-[#008080] dark:text-teal-400">Minhas Criações</h1>
                 <Button onClick={() => onNavigate('studio')} variant="secondary">
                     <i className="fa-solid fa-plus mr-2"></i> Criar Novo Conteúdo
                 </Button>
             </div>
 
             {isLoading ? (
-                <p className="text-center text-gray-600">Carregando suas criações...</p>
+                <p className="text-center text-gray-600 dark:text-gray-400">Carregando suas criações...</p>
             ) : items.length === 0 ? (
-                <div className="text-center py-16 bg-white/80 rounded-2xl shadow-lg border border-gray-200">
-                        <i className="fa-solid fa-folder-open text-6xl text-gray-400 mb-4"></i>
-                        <h2 className="text-2xl font-bold text-gray-700">Nenhuma criação salva ainda</h2>
-                        <p className="text-gray-500 mt-2">Use o Studio para criar e salvar seu primeiro conteúdo!</p>
+                <div className="text-center py-16 bg-white/80 dark:bg-gray-800/90 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
+                        <i className="fa-solid fa-folder-open text-6xl text-gray-400 dark:text-gray-500 mb-4"></i>
+                        <h2 className="text-2xl font-bold text-gray-700 dark:text-gray-300">Nenhuma criação salva ainda</h2>
+                        <p className="text-gray-500 dark:text-gray-400 mt-2">Use o Studio para criar e salvar seu primeiro conteúdo!</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">

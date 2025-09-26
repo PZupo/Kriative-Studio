@@ -13,8 +13,8 @@ const SelectionButton: React.FC<SelectionButtonProps> = ({ label, isSelected, on
 
     // Determine classes based on state
     const selectedClasses = 'bg-[#008080] text-white ring-4 ring-offset-2 ring-[#39ff14] scale-105 shadow-xl border-transparent';
-    const unselectedClasses = 'bg-white text-gray-700 hover:bg-gray-100 hover:text-[#008080] shadow-md border-gray-200 hover:scale-105';
-    const disabledClasses = 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'; // No hover scale
+    const unselectedClasses = 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 shadow-md border-gray-200 dark:border-gray-600 hover:scale-105';
+    const disabledClasses = 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed border-gray-200 dark:border-gray-700'; // No hover scale
 
     const stateClasses = disabled
         ? disabledClasses
@@ -23,7 +23,7 @@ const SelectionButton: React.FC<SelectionButtonProps> = ({ label, isSelected, on
             : unselectedClasses;
 
     // Determine icon color
-    const iconColor = isSelected ? 'text-white' : disabled ? 'text-gray-400' : 'text-[#ff8c00]';
+    const iconColor = isSelected ? 'text-white' : disabled ? 'text-gray-400 dark:text-gray-500' : 'text-[#ff8c00]';
 
     return (
         <button

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+// FIX: Import useAuth from AuthContext to resolve missing member error.
 import { useAuth } from '../contexts/AuthContext';
 import { SavedContentItem } from '../types';
 import Button from './common/Button';
@@ -78,7 +79,7 @@ const CalendarScreen: React.FC<Props> = ({ onNavigate }) => {
         const isCurrentMonth = today.getFullYear() === currentDate.getFullYear() && today.getMonth() === currentDate.getMonth();
 
         return [...blanks, ...days].map((day, index) => {
-            if (!day) return <div key={`blank-${index}`} className="border rounded-md"></div>;
+            if (!day) return <div key={`blank-${index}`} className="border dark:border-gray-700 rounded-md"></div>;
             
             const dayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
             const itemsForDay = scheduledItems.filter(item => {
@@ -89,11 +90,11 @@ const CalendarScreen: React.FC<Props> = ({ onNavigate }) => {
             });
 
             return (
-                <div key={day} className={`border rounded-md p-2 flex flex-col min-h-[120px] ${isCurrentMonth && day === today.getDate() ? 'bg-teal-50' : 'bg-white'}`}>
-                    <span className={`font-bold ${isCurrentMonth && day === today.getDate() ? 'text-teal-600' : 'text-gray-700'}`}>{day}</span>
+                <div key={day} className={`border dark:border-gray-700 rounded-md p-2 flex flex-col min-h-[120px] ${isCurrentMonth && day === today.getDate() ? 'bg-teal-50 dark:bg-teal-900/30' : 'bg-white dark:bg-gray-800'}`}>
+                    <span className={`font-bold ${isCurrentMonth && day === today.getDate() ? 'text-teal-600 dark:text-teal-400' : 'text-gray-700 dark:text-gray-300'}`}>{day}</span>
                     <div className="mt-1 space-y-1 overflow-y-auto">
                         {itemsForDay.map(item => (
-                            <div key={item.id} className="bg-green-100 text-green-800 text-xs p-1 rounded">
+                            <div key={item.id} className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 text-xs p-1 rounded">
                                 {item.selections.format}
                             </div>
                         ))}
@@ -106,19 +107,19 @@ const CalendarScreen: React.FC<Props> = ({ onNavigate }) => {
     return (
         <div className="max-w-6xl mx-auto animate-fade-in">
             <div className="flex flex-wrap justify-between items-center mb-8 gap-4">
-                <h1 className="text-4xl font-extrabold text-[#008080]">Calendário de Conteúdo</h1>
+                <h1 className="text-4xl font-extrabold text-[#008080] dark:text-teal-400">Calendário de Conteúdo</h1>
                 <Button onClick={handleOpenPlanner} variant="primary">
                     <i className="fa-solid fa-brain mr-2"></i> Planejador IA
                 </Button>
             </div>
 
-            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-200">
+            <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
                 <div className="flex justify-between items-center mb-4">
                     <Button onClick={() => changeMonth(-1)} variant="ghost"><i className="fa-solid fa-chevron-left"></i></Button>
-                    <h2 className="text-2xl font-bold capitalize">{monthName} {year}</h2>
+                    <h2 className="text-2xl font-bold capitalize dark:text-gray-200">{monthName} {year}</h2>
                     <Button onClick={() => changeMonth(1)} variant="ghost"><i className="fa-solid fa-chevron-right"></i></Button>
                 </div>
-                <div className="grid grid-cols-7 gap-2 text-center font-semibold text-gray-500 mb-2">
+                <div className="grid grid-cols-7 gap-2 text-center font-semibold text-gray-500 dark:text-gray-400 mb-2">
                     {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => <div key={day}>{day}</div>)}
                 </div>
                 <div className="grid grid-cols-7 gap-2">

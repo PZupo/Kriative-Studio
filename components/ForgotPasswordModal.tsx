@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Button from './common/Button';
 import { useNotification } from '../contexts/NotificationContext';
-import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
+import { supabase } from '../services/supabaseClient';
 
 interface ForgotPasswordModalProps {
     isOpen: boolean;
@@ -14,7 +14,7 @@ const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen, onClo
     const { showToast } = useNotification();
 
     const handleReset = async () => {
-        if (!isSupabaseConfigured) {
+        if (!supabase) {
             showToast('Funcionalidade indisponível: o backend não foi configurado.', 'error');
             return;
         }
@@ -25,9 +25,8 @@ const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen, onClo
         }
         setIsLoading(true);
         try {
-            // Documentação do Supabase: https://supabase.com/docs/reference/javascript/auth-resetpasswordforemail
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: window.location.origin, // Link para onde o usuário será redirecionado após clicar no link do e-mail
+                redirectTo: window.location.origin,
             });
             if (error) throw error;
             showToast('Se uma conta existir, um link de redefinição foi enviado.', 'success');
@@ -46,25 +45,25 @@ const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen, onClo
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-4 animate-fade-in" onClick={onClose}>
-            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm transform transition-all" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-sm transform transition-all" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold text-gray-800">Redefinir Senha</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-2xl">
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200">Redefinir Senha</h2>
+                    <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-2xl">
                         <i className="fa-solid fa-times"></i>
                     </button>
                 </div>
                 <div>
-                    <p className="text-sm text-gray-600 mb-4">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                         Insira seu e-mail e enviaremos um link para você voltar a acessar sua conta.
                     </p>
-                    <label htmlFor="reset-email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <label htmlFor="reset-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
                     <input
                         type="email"
                         id="reset-email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="seu@email.com"
-                        className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008080]"
+                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008080] bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                         disabled={isLoading}
                     />
                 </div>

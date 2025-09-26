@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { Selections } from '../types';
 import { VIDEO_FORMATS } from '../constants';
@@ -51,12 +50,12 @@ const LoadingScreen: React.FC<Props> = ({ selections }) => {
     }, [isVideo]);
 
     return (
-        <div className="fixed inset-0 bg-[#f5f5dc] flex flex-col items-center justify-center z-50">
+        <div className="fixed inset-0 bg-[#f5f5dc] dark:bg-gray-900 flex flex-col items-center justify-center z-50">
             <div className="text-center">
-                <i className={`fa-solid ${isVideo ? 'fa-clapperboard' : 'fa-wand-magic-sparkles'} text-6xl text-[#008080] animate-pulse`}></i>
-                <h2 className="text-3xl font-bold text-gray-800 mt-6 mb-2">Gerando o seu {isVideo ? 'vídeo' : 'conteúdo'}...</h2>
-                <p className="text-lg text-gray-600 mb-8 transition-opacity duration-500">{message}</p>
-                <div className="w-full max-w-md bg-gray-200 rounded-full h-4 overflow-hidden shadow-inner">
+                <i className={`fa-solid ${isVideo ? 'fa-clapperboard' : 'fa-wand-magic-sparkles'} text-6xl text-[#008080] dark:text-teal-400 animate-pulse`}></i>
+                <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200 mt-6 mb-2">Gerando o seu {isVideo ? 'vídeo' : 'conteúdo'}...</h2>
+                <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 transition-opacity duration-500">{message}</p>
+                <div className="w-full max-w-md bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden shadow-inner">
                     <div
                         className="bg-gradient-to-r from-[#39ff14] to-[#008080] h-4 rounded-full transition-all duration-500 ease-out"
                         style={{ width: `${progress}%` }}

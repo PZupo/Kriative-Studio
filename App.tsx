@@ -1,6 +1,3 @@
-
-
-
 import React, { useState } from 'react';
 // FIX: Import useAuth from AuthContext to resolve missing member error.
 import { useAuth } from './contexts/AuthContext';
@@ -8,6 +5,7 @@ import Header from './components/Header';
 import AuthScreen from './components/AuthScreen';
 import HistoryScreen from './components/HistoryScreen';
 import CalendarScreen from './components/CalendarScreen';
+import LiveScreen from './components/LiveScreen'; // Novo
 import MissingConfigurationScreen from './components/MissingConfigurationScreen'; // Novo
 import { isSupabaseConfigured } from './services/supabaseClient';
 import { isGeminiConfigured } from './services/geminiService';
@@ -27,7 +25,7 @@ import LoadingScreen from './components/LoadingScreen';
 import ResultScreen from './components/ResultScreen';
 import { geminiService } from './services/geminiService';
 
-type AppView = 'studio' | 'history' | 'calendar';
+type AppView = 'studio' | 'history' | 'calendar' | 'live';
 
 const StudioView: React.FC = () => {
     const { user, updateUser } = useAuth();
@@ -107,7 +105,7 @@ const StudioView: React.FC = () => {
     };
 
     return (
-        <div className="max-w-4xl mx-auto bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 md:p-10 border border-gray-200">
+        <div className="max-w-4xl mx-auto bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 md:p-10 border border-gray-200 dark:border-gray-700">
             <div className="mb-8">
                 <StepIndicator currentStep={step} />
             </div>
@@ -129,8 +127,8 @@ const App: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#f5f5dc] flex items-center justify-center">
-                <i className="fa-solid fa-spinner fa-spin text-4xl text-[#008080]"></i>
+            <div className="min-h-screen bg-[#f5f5dc] dark:bg-gray-900 flex items-center justify-center">
+                <i className="fa-solid fa-spinner fa-spin text-4xl text-[#008080] dark:text-teal-400"></i>
             </div>
         );
     }
@@ -143,12 +141,13 @@ const App: React.FC = () => {
         switch (currentView) {
             case 'history': return <HistoryScreen onNavigate={setCurrentView} />;
             case 'calendar': return <CalendarScreen onNavigate={setCurrentView} />;
+            case 'live': return <LiveScreen />;
             case 'studio': default: return <StudioView />;
         }
     };
     
     return (
-        <div className="bg-[#f5f5dc] min-h-screen font-sans">
+        <div className="bg-[#f5f5dc] dark:bg-gray-900 min-h-screen font-sans">
             <Header currentView={currentView} onNavigate={setCurrentView} />
             <main className="pt-28 pb-10 px-4">
                 {renderCurrentView()}

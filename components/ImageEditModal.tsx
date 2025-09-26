@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Button from './common/Button';
+import { geminiService } from '../services/geminiService';
 
 interface ImageEditModalProps {
     isOpen: boolean;
@@ -11,9 +12,10 @@ interface ImageEditModalProps {
 const ImageEditModal: React.FC<ImageEditModalProps> = ({ isOpen, imageUrl, onClose, onRegenerate }) => {
     const [prompt, setPrompt] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const isAiConfigured = geminiService.isConfigured();
 
     const handleRegenerateClick = async () => {
-        if (!prompt.trim()) return;
+        if (!prompt.trim() || !isAiConfigured) return;
         setIsLoading(true);
         try {
             await onRegenerate(prompt);
@@ -30,23 +32,23 @@ const ImageEditModal: React.FC<ImageEditModalProps> = ({ isOpen, imageUrl, onClo
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[60] p-4" onClick={onClose}>
-            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-3xl transform transition-all duration-300 scale-100 animate-fade-in flex flex-col md:flex-row gap-6" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-3xl transform transition-all duration-300 scale-100 animate-fade-in flex flex-col md:flex-row gap-6" onClick={(e) => e.stopPropagation()}>
                 <div className="flex-shrink-0 md:w-1/2">
-                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Editar Imagem</h2>
+                    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4">Editar Imagem</h2>
                     <img src={imageUrl} alt="Editing preview" className="w-full h-auto object-contain rounded-lg shadow-md max-h-[60vh]" />
                 </div>
                 <div className="flex flex-col md:w-1/2">
-                    <h3 className="text-lg font-semibold text-gray-700 mb-2">Descreva as alterações:</h3>
+                    <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">Descreva as alterações:</h3>
                     <textarea
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
-                        placeholder="Ex: adicione um chapéu de sol, mude a cor do céu para o pôr do sol, faça o objeto sorrir..."
+                        placeholder={!isAiConfigured ? "Funcionalidade indisponível no modo de demonstração" : "Ex: adicione um chapéu de sol, mude a cor do céu para o pôr do sol, faça o objeto sorrir..."}
                         rows={6}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008080]"
-                        disabled={isLoading}
+                        className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008080] bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        disabled={isLoading || !isAiConfigured}
                     />
                     <div className="mt-auto pt-4 space-y-2">
-                        <Button onClick={handleRegenerateClick} className="w-full" disabled={!prompt.trim() || isLoading}>
+                        <Button onClick={handleRegenerateClick} className="w-full" disabled={!prompt.trim() || isLoading || !isAiConfigured}>
                             {isLoading ? (
                                 <>
                                     <i className="fa-solid fa-spinner fa-spin mr-2"></i>

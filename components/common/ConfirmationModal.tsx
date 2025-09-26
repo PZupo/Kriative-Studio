@@ -14,14 +14,14 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onClose, 
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-4 animate-fade-in" onClick={onClose}>
-            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md transform transition-all" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-md transform transition-all" onClick={(e) => e.stopPropagation()}>
                 <div className="text-center">
                     <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
                          <i className="fa-solid fa-exclamation-triangle text-2xl text-red-600"></i>
                     </div>
-                    <h3 className="text-lg leading-6 font-medium text-gray-900 mt-4">{title}</h3>
+                    <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-gray-200 mt-4">{title}</h3>
                     <div className="mt-2 px-4 py-2">
-                        <p className="text-sm text-gray-500">{message}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{message}</p>
                     </div>
                 </div>
                 <div className="mt-5 sm:mt-6 flex justify-center gap-3">

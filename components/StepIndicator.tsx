@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface StepIndicatorProps {
@@ -23,13 +22,13 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep }) => {
                             <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center font-bold text-lg transition-all duration-300
                                 ${isActive ? 'bg-[#ff8c00] text-white scale-110 shadow-lg' : ''}
                                 ${isCompleted ? 'bg-[#008080] text-white' : ''}
-                                ${!isActive && !isCompleted ? 'bg-gray-200 text-gray-500' : ''}
+                                ${!isActive && !isCompleted ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400' : ''}
                             `}>
                                 {isCompleted ? <i className="fa-solid fa-check"></i> : stepNumber}
                             </div>
-                            <span className={`mt-2 text-xs md:text-sm font-semibold transition-colors duration-300 ${isActive ? 'text-[#ff8c00]' : 'text-gray-500'}`}>{label}</span>
+                            <span className={`mt-2 text-xs md:text-sm font-semibold transition-colors duration-300 ${isActive ? 'text-[#ff8c00]' : 'text-gray-500 dark:text-gray-400'}`}>{label}</span>
                         </div>
-                        {stepNumber < steps.length && <div className={`flex-1 h-1 mx-2 rounded-full ${isCompleted ? 'bg-[#008080]' : 'bg-gray-200'}`}></div>}
+                        {stepNumber < steps.length && <div className={`flex-1 h-1 mx-2 rounded-full ${isCompleted ? 'bg-[#008080]' : 'bg-gray-200 dark:bg-gray-700'}`}></div>}
                     </React.Fragment>
                 );
             })}

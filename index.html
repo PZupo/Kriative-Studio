@@ -9,6 +9,22 @@
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
+    <!-- Theme loader script to prevent FOUC -->
+    <script>
+        (function() {
+            try {
+                // 1. Check for stored theme
+                const theme = localStorage.getItem('kriative-theme');
+                // 2. Apply 'dark' class to <html> if it's the stored theme
+                if (theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                }
+            } catch (e) {
+                console.error('Could not apply theme from localStorage.', e);
+            }
+        })();
+    </script>
+    
     <!-- Basic global styles and animations -->
     <style>
         body {
@@ -18,7 +34,12 @@
                 sans-serif;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
-            background-color: #f5f5dc; /* Matches app background */
+            background-color: #f5f5dc; /* Light theme background */
+            transition: background-color 0.3s ease-in-out;
+        }
+        /* Apply dark theme background to body if .dark class is on <html> */
+        .dark body {
+             background-color: #111827; /* Tailwind gray-900 */
         }
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         .animate-fade-in { animation: fade-in 0.5s ease-in-out forwards; }
@@ -42,7 +63,6 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
 <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

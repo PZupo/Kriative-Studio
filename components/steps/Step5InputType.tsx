@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { Selections } from '../../types';
 import { INPUT_TYPES } from '../../constants';
@@ -20,7 +19,7 @@ const inputTypeIcons: { [key: string]: string } = {
 const Step5InputType: React.FC<Props> = ({ selections, onSelect, onNext, onBack }) => {
     return (
         <div className="flex flex-col items-center animate-fade-in">
-            <h2 className="text-2xl font-bold text-center mb-6">Como você quer descrever sua ideia?</h2>
+            <h2 className="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-gray-200">Como você quer descrever sua ideia?</h2>
             <div className="w-full max-w-sm space-y-4">
                 {INPUT_TYPES.map(type => (
                     <SelectionButton

@@ -1,5 +1,7 @@
 {
-  "name": "Copy of Kriative Social Studio",
+  "name": "Copy of Copy of Kriative Social Studio",
   "description": "An AI-powered web application to generate social media content for various platforms with different styles and formats. It includes features for text and image-based prompts, a professional prompt generator, and a subscription model for premium features.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "microphone"
+  ]
 }
