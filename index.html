@@ -20,37 +20,12 @@
             -moz-osx-font-smoothing: grayscale;
             background-color: #f5f5dc; /* Matches app background */
         }
-
-        /* Animations used in components */
-        @keyframes fade-in {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        .animate-fade-in {
-            animation: fade-in 0.5s ease-in-out forwards;
-        }
-
-        @keyframes fade-in-down {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in-down {
-            animation: fade-in-down 0.5s ease-in-out forwards;
-        }
-        
-        @keyframes toast-in {
-            from {
-                opacity: 0;
-                transform: translateX(100%);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-        .animate-toast-in {
-            animation: toast-in 0.5s forwards;
-        }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fade-in { animation: fade-in 0.5s ease-in-out forwards; }
+        @keyframes fade-in-down { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in-down { animation: fade-in-down 0.5s ease-in-out forwards; }
+        @keyframes toast-in { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
+        .animate-toast-in { animation: toast-in 0.5s forwards; }
     </style>
 <script type="importmap">
 {
@@ -58,21 +33,20 @@
     "react": "https://aistudiocdn.com/react@^19.1.1",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
     "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.58.0",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.20.0",
     "jspdf": "https://aistudiocdn.com/jspdf@^3.0.3",
     "jspdf-autotable": "https://aistudiocdn.com/jspdf-autotable@^5.0.2",
-    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.58.0",
     "vite": "https://aistudiocdn.com/vite@^7.1.7",
     "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.0.3"
   }
 }
 </script>
+<link rel="stylesheet" href="/index.css">
 </head>
 <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
-
-    <!-- Main application script loaded by Vite. Vite handles all module bundling. -->
     <script type="module" src="/index.tsx"></script>
 </body>
 </html>
