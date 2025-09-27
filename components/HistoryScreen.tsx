@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import Button from './common/Button';
 import ConfirmationModal from './common/ConfirmationModal';
-import ScheduleModal from './common/ScheduleModal';
+import ScheduleModal from './ScheduleModal';
 
 type AppView = 'studio' | 'history' | 'calendar';
 
