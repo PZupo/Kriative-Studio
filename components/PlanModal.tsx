@@ -28,22 +28,17 @@ const PlanModal: React.FC<PlanModalProps> = ({ isOpen, onClose }) => {
 
         setIsProcessing(true);
         try {
-            // In a real app, this would redirect to a Stripe checkout page.
-            // We'll simulate the checkout and update the user's plan locally.
-            const { url } = await apiService.createCheckoutSession(planKey, user.uid);
-            console.log("Redirecting to checkout:", url);
-
-            // SIMULATION: For this app, we'll just update the plan directly.
-            // In a real app, this would be handled by a Stripe webhook.
-            showToast('Simulando upgrade... Plano atualizado com sucesso!', 'success');
-            const newPlanConfig = PLAN_CONFIGS[planKey];
-            updateUser({ plan: planKey, credits: user.credits + newPlanConfig.credits }); // Add new credits on top of old for simulation
-            onClose();
+            // Call the edge function to create a checkout session
+            const { url } = await apiService.createCheckoutSession(planKey);
+            
+            // Redirect the user to the Stripe checkout page
+            window.location.href = url;
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro ao processar o pagamento.";
             showToast(errorMessage, 'error');
         } finally {
+            // The user will be redirected, so this might not even be seen
             setIsProcessing(false);
         }
     };
@@ -88,7 +83,7 @@ const PlanModal: React.FC<PlanModalProps> = ({ isOpen, onClose }) => {
                                     variant={isCurrentPlan ? 'secondary' : 'primary'}
                                     className="w-full mt-auto"
                                 >
-                                    {isCurrentPlan ? 'Plano Atual' : 'Selecionar'}
+                                    {isCurrentPlan ? 'Plano Atual' : isProcessing ? 'Processando...' : 'Selecionar'}
                                 </Button>
                             </div>
                         );
