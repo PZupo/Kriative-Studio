@@ -62,9 +62,9 @@ const generateImagePost = async (selections: Selections): Promise<GeneratedConte
         }
     `;
 
-    // FIX: Simplified the image generation prompt to be more direct and keyword-based, avoiding complex structures
-    // that could lead to an 'INVALID_ARGUMENT' error from the Imagen API.
-    const imageGenerationPrompt = `social media post, subject: ${prompt}, visual style: ${visualStyle}, cinematic, high resolution, vibrant color, dramatic lighting, aspect ratio ${formatConfig.aspectRatio}, no text, no words`;
+    // REFACTOR: Simplified the image prompt to be more direct and keyword-based,
+    // avoiding contextual phrases that could cause an INVALID_ARGUMENT error.
+    const imageGenerationPrompt = `${prompt}, ${visualStyle}, cinematic lighting, high detail, vibrant colors`;
 
     const textPromise = ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -169,12 +169,12 @@ const generateManga = async (selections: Selections): Promise<GeneratedContent> 
     const story = parseJsonResponse(storyResponse.text);
     const allPanelDescriptions = story.pages.flatMap((p: any) => p.panels.map((panel: any) => panel.image_description));
     
-    // FIX: Simplified the manga image generation prompt to be more direct and keyword-based,
-    // reducing the risk of an 'INVALID_ARGUMENT' error from the Imagen API.
     const imagePromises = allPanelDescriptions.map((desc: string) => 
         ai.models.generateImages({
             model: 'imagen-4.0-generate-001',
-            prompt: `black and white manga panel, art style: ${visualStyle}, scene: ${desc}, no text, no words, just the art`,
+            // REFACTOR: Simplified the manga panel prompt to be more descriptive and keyword-based,
+            // removing ambiguous prefixes like "scene:" to resolve the INVALID_ARGUMENT error.
+            prompt: `manga panel in black and white, ${visualStyle} style, ${desc}, dynamic angle, high contrast, clean lines, screentones, no text`,
             config: { numberOfImages: 1, aspectRatio: '3:4', outputMimeType: 'image/png' }
         })
     );
