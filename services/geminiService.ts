@@ -63,9 +63,11 @@ const generateImagePost = async (selections: Selections): Promise<GeneratedConte
     `;
 
     const imageGenerationPrompt = `
-        Crie uma imagem com a proporção de ${formatConfig.aspectRatio} para um post sobre "${prompt}".
-        O estilo visual deve ser: ${visualStyle}.
-        A imagem deve ser de alta qualidade, fotorealista e impactante.
+        Um post de mídia social para ${platform}.
+        **Assunto Principal:** "${prompt}".
+        **Estilo Visual:** ${visualStyle}, cinematográfico, alta resolução, cor vibrante, iluminação dramática.
+        **Proporção da Imagem:** ${formatConfig.aspectRatio}.
+        A imagem não deve conter texto ou palavras.
     `;
 
     const textPromise = ai.models.generateContent({
@@ -174,7 +176,7 @@ const generateManga = async (selections: Selections): Promise<GeneratedContent> 
     const imagePromises = allPanelDescriptions.map((desc: string) => 
         ai.models.generateImages({
             model: 'imagen-4.0-generate-001',
-            prompt: `${desc}, estilo de mangá preto e branco, ${visualStyle}`,
+            prompt: `Painel de mangá em preto e branco, estilo de arte ${visualStyle}. A cena é: ${desc}. Sem texto ou palavras, apenas a arte.`,
             config: { numberOfImages: 1, aspectRatio: '3:4', outputMimeType: 'image/png' }
         })
     );
