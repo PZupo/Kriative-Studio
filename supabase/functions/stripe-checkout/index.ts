@@ -1,6 +1,6 @@
 // supabase/functions/stripe-checkout/index.ts
-// FIX: Updated the Deno types reference to use a more reliable CDN (unpkg) to resolve type loading issues and fix "Cannot find name 'Deno'" errors.
-/// <reference types="https://unpkg.com/@supabase/functions-js@2.4.1/src/edge-runtime.d.ts" />
+// FIX: The previous Deno types reference from unpkg was failing. Switched to esm.sh which is a more stable CDN for Deno types and resolves the "Cannot find name 'Deno'" errors.
+/// <reference types="https://esm.sh/@supabase/functions-js@2.4.1/src/edge-runtime.d.ts" />
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Stripe from 'https://esm.sh/stripe@14.20.0';

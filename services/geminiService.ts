@@ -95,9 +95,10 @@ const generateVideo = async (selections: Selections): Promise<GeneratedContent> 
     if (!ai) throw new Error("Gemini not configured.");
     const { visualStyle, prompt, duration, imagePrompt, format } = selections;
     const formatConfig = format ? FORMAT_CONFIGS[format] : null;
-    const aspectRatio = formatConfig?.aspectRatio || '16:9'; // Default to horizontal if not specified
+    const aspectRatio = formatConfig?.aspectRatio || '16:9';
     
-    const fullPrompt = `Crie um vídeo no estilo ${visualStyle}, com uma proporção de tela de ${aspectRatio}. O vídeo deve ser sobre: "${prompt}". Duração de ${duration} segundos.`;
+    const isVertical = aspectRatio === '9:16';
+    const fullPrompt = `Crie um vídeo com áudio (trilha sonora ou efeitos sonoros apropriados) ${isVertical ? 'vertical (formato retrato) ' : ''}no estilo ${visualStyle}, seguindo estritamente a proporção de tela de ${aspectRatio}. O vídeo deve ser sobre: "${prompt}". Duração de ${duration} segundos.`;
     
     let operation;
     if (imagePrompt) {
@@ -211,7 +212,7 @@ const generateMangaMagazine = async (selections: Selections): Promise<GeneratedC
 const generateMangaVideo = async (selections: Selections): Promise<GeneratedContent> => {
      if (!ai) throw new Error("Gemini not configured.");
     const { prompt, duration } = selections;
-    const videoPrompt = `Crie um vídeo de anime com base na seguinte história: "${prompt}". O vídeo deve ter um estilo de mangá animado, com legendas e uma narração dramática. Duração de ${duration} segundos.`;
+    const videoPrompt = `Crie um vídeo de anime com áudio e narração dramática, com base na seguinte história: "${prompt}". O vídeo deve ter um estilo de mangá animado, com legendas. Duração de ${duration} segundos.`;
 
     let operation = await ai.models.generateVideos({
         model: 'veo-2.0-generate-001',
