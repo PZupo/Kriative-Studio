@@ -6,6 +6,7 @@ import { FORMAT_CONFIGS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import * as geminiService from '../services/geminiService';
 import ImageEditModal from './ImageEditModal';
+import { compressImage } from '../utils/imageUtils';
 
 interface Props {
     content: GeneratedContent;
@@ -23,6 +24,7 @@ const ResultScreen: React.FC<Props> = ({ content, onReset, selections }) => {
     const [videoBlobUrl, setVideoBlobUrl] = useState<string | null>(null);
     const [isVideoLoading, setIsVideoLoading] = useState(false);
     const [editingState, setEditingState] = useState<{ url: string; index: number } | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
 
     const formatConfig = selections.format ? FORMAT_CONFIGS[selections.format] : null;
@@ -103,44 +105,75 @@ const ResultScreen: React.FC<Props> = ({ content, onReset, selections }) => {
         document.body.removeChild(link);
     };
 
-    const handleSaveContent = () => {
+    const handleSaveContent = async () => {
         if (!user) {
             showToast('Você precisa estar logado para salvar o conteúdo.', 'error');
             return;
         }
 
-        const newSavedItem: SavedContentItem = {
-            id: `saved_${Date.now()}`,
-            selections,
-            content: currentContent,
-            savedAt: new Date().toISOString(),
-        };
-
-        const storageKey = `kriative_studio_saved_content_${user.uid}`;
-        let savedContent: SavedContentItem[] = [];
+        setIsSaving(true);
 
         try {
-            const existingContent = localStorage.getItem(storageKey);
-            if (existingContent) {
-                savedContent = JSON.parse(existingContent);
+            // Create a deep copy to avoid mutating the displayed content state
+            const contentToSave = JSON.parse(JSON.stringify(currentContent));
+
+            // Compress main images if they exist
+            if (contentToSave.images && contentToSave.images.length > 0) {
+                const compressedImages = await Promise.all(
+                    contentToSave.images.map((img: string) => compressImage(img, 0.75))
+                );
+                contentToSave.images = compressedImages;
             }
-        } catch (error) {
-            console.error("Erro ao analisar conteúdo salvo do localStorage:", error);
-            savedContent = [];
-        }
 
-        savedContent.unshift(newSavedItem);
-        const MAX_SAVED_ITEMS = 10;
-        if (savedContent.length > MAX_SAVED_ITEMS) {
-            savedContent = savedContent.slice(0, MAX_SAVED_ITEMS);
-        }
+            // Compress storyboard/manga images if they exist
+            if (contentToSave.storyboards && contentToSave.storyboards.length > 0) {
+                for (const page of contentToSave.storyboards) {
+                    for (const panel of page) {
+                        if (panel.image) {
+                            panel.image = await compressImage(panel.image, 0.75);
+                        }
+                    }
+                }
+            }
 
-        try {
-            localStorage.setItem(storageKey, JSON.stringify(savedContent));
-            showToast('Salvo! Agende em "Minhas Criações".');
-        } catch (error) {
-            console.error('Falha ao salvar conteúdo no localStorage:', error);
-            showToast('Erro ao salvar: o conteúdo é muito grande para a galeria.', 'error');
+            const newSavedItem: SavedContentItem = {
+                id: `saved_${Date.now()}`,
+                selections,
+                content: contentToSave,
+                savedAt: new Date().toISOString(),
+            };
+
+            const storageKey = `kriative_studio_saved_content_${user.uid}`;
+            let savedContent: SavedContentItem[] = [];
+
+            try {
+                const existingContent = localStorage.getItem(storageKey);
+                if (existingContent) {
+                    savedContent = JSON.parse(existingContent);
+                }
+            } catch (error) {
+                console.error("Erro ao analisar conteúdo salvo do localStorage:", error);
+                savedContent = [];
+            }
+
+            savedContent.unshift(newSavedItem);
+            const MAX_SAVED_ITEMS = 20; // Increased limit as content is now smaller
+            if (savedContent.length > MAX_SAVED_ITEMS) {
+                savedContent = savedContent.slice(0, MAX_SAVED_ITEMS);
+            }
+
+            try {
+                localStorage.setItem(storageKey, JSON.stringify(savedContent));
+                showToast('Salvo! Agende em "Minhas Criações".', 'success');
+            } catch (error) {
+                console.error('Falha ao salvar conteúdo no localStorage:', error);
+                showToast('Erro ao salvar. O armazenamento local pode estar cheio.', 'error');
+            }
+        } catch (compressionError) {
+            console.error('Falha ao comprimir imagens:', compressionError);
+            showToast('Erro ao preparar conteúdo para salvar.', 'error');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -334,7 +367,17 @@ const ResultScreen: React.FC<Props> = ({ content, onReset, selections }) => {
 
                 <div className="mt-12 text-center space-y-4">
                      <div className="flex flex-wrap justify-center items-center gap-4">
-                        <Button onClick={handleSaveContent} variant="primary"><i className="fa-solid fa-star mr-2"></i> Salvar na Galeria</Button>
+                        <Button onClick={handleSaveContent} variant="primary" disabled={isSaving}>
+                            {isSaving ? (
+                                <>
+                                    <i className="fa-solid fa-spinner fa-spin mr-2"></i> Salvando...
+                                </>
+                            ) : (
+                                <>
+                                    <i className="fa-solid fa-star mr-2"></i> Salvar na Galeria
+                                </>
+                            )}
+                        </Button>
                         <Button onClick={onReset} variant="secondary" className="text-lg"><i className="fa-solid fa-plus mr-2"></i> Criar Novo Conteúdo</Button>
                     </div>
                 </div>
