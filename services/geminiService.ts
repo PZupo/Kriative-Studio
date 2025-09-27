@@ -43,6 +43,24 @@ const getMockContent = async (selections: Selections): Promise<GeneratedContent>
     };
 };
 
+// Helper to wrap image generation with specific error handling
+const generateImageWithBillingCheck = async (prompt: string, config: any) => {
+    if (!ai) throw new Error("Cliente de IA Gemini não inicializado.");
+    try {
+        return await ai.models.generateImages({
+            model: 'imagen-4.0-generate-001',
+            prompt,
+            config
+        });
+    } catch (error) {
+        if (error instanceof Error && error.message.includes('billed users')) {
+            throw new Error("A API de Imagem requer um projeto Google Cloud com faturamento ativado. Por favor, verifique sua configuração.");
+        }
+        throw error; // Re-throw other errors
+    }
+};
+
+
 const generateImagePost = async (selections: Selections): Promise<GeneratedContent> => {
     if (!ai) throw new Error("Cliente de IA Gemini não inicializado.");
 
@@ -61,9 +79,7 @@ const generateImagePost = async (selections: Selections): Promise<GeneratedConte
             "hashtags": "Uma string com 5 a 7 hashtags relevantes, separadas por espaços."
         }
     `;
-
-    // REFACTOR: Simplified the image prompt to be more direct and keyword-based,
-    // avoiding contextual phrases that could cause an INVALID_ARGUMENT error.
+    
     const imageGenerationPrompt = `${prompt}, ${visualStyle}, cinematic lighting, high detail, vibrant colors`;
 
     const textPromise = ai.models.generateContent({
@@ -72,16 +88,13 @@ const generateImagePost = async (selections: Selections): Promise<GeneratedConte
         config: { responseMimeType: 'application/json' }
     });
     
+    const imageConfig = {
+        numberOfImages: 1,
+        aspectRatio: formatConfig.aspectRatio,
+        outputMimeType: 'image/png',
+    };
     const imagePromises = Array.from({ length: quantity }, () => 
-        ai.models.generateImages({
-            model: 'imagen-4.0-generate-001',
-            prompt: imageGenerationPrompt,
-            config: {
-                numberOfImages: 1,
-                aspectRatio: formatConfig.aspectRatio,
-                outputMimeType: 'image/png',
-            }
-        })
+       generateImageWithBillingCheck(imageGenerationPrompt, imageConfig)
     );
 
     const [textResponse, ...imageResponses] = await Promise.all([textPromise, ...imagePromises]);
@@ -169,14 +182,12 @@ const generateManga = async (selections: Selections): Promise<GeneratedContent> 
     const story = parseJsonResponse(storyResponse.text);
     const allPanelDescriptions = story.pages.flatMap((p: any) => p.panels.map((panel: any) => panel.image_description));
     
+    const imageConfig = { numberOfImages: 1, aspectRatio: '3:4', outputMimeType: 'image/png' };
     const imagePromises = allPanelDescriptions.map((desc: string) => 
-        ai.models.generateImages({
-            model: 'imagen-4.0-generate-001',
-            // REFACTOR: Simplified the manga panel prompt to be more descriptive and keyword-based,
-            // removing ambiguous prefixes like "scene:" to resolve the INVALID_ARGUMENT error.
-            prompt: `manga panel in black and white, ${visualStyle} style, ${desc}, dynamic angle, high contrast, clean lines, screentones, no text`,
-            config: { numberOfImages: 1, aspectRatio: '3:4', outputMimeType: 'image/png' }
-        })
+        generateImageWithBillingCheck(
+            `manga panel in black and white, ${visualStyle} style, ${desc}, dynamic angle, high contrast, clean lines, screentones, no text`,
+            imageConfig
+        )
     );
     
     const imageResponses = await Promise.all(imagePromises);

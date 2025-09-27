@@ -46,6 +46,18 @@ const MissingConfigurationScreen: React.FC = () => {
                             <li>Acione um novo "deploy" (reimplantação) para que as alterações tenham efeito.</li>
                         </ol>
                     </div>
+                    
+                    <div className="p-4 bg-orange-50 dark:bg-orange-900/50 border border-orange-200 dark:border-orange-800 rounded-lg">
+                        <h3 className="text-lg font-semibold text-orange-800 dark:text-orange-300 flex items-center gap-2">
+                            <i className="fa-solid fa-credit-card"></i>
+                            Aviso: Geração de Imagens
+                        </h3>
+                        <p className="text-sm text-orange-700 dark:text-orange-300 mt-2">
+                            O modelo de geração de imagens do Google (Imagen) requer que sua Chave de API esteja associada a um projeto do <strong>Google Cloud Platform</strong> com o <strong>faturamento ativado</strong>.
+                            Chaves de API gratuitas geradas no Google AI Studio podem não funcionar para esta funcionalidade.
+                        </p>
+                    </div>
+
                      {!isViteLoaded && (
                         <div className="mt-6 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg text-sm">
                             <strong>Aviso:</strong> O aplicativo parece não estar rodando em um ambiente Vite. A leitura de variáveis de ambiente pode não funcionar como esperado.
