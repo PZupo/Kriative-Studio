@@ -5,7 +5,6 @@ import { useNotification } from '../contexts/NotificationContext';
 import { PLAN_CONFIGS } from '../constants';
 import { PlanKey } from '../types';
 import Button from './common/Button';
-import { apiService } from '../services/apiService';
 import { generateUsageSuggestionsPDF } from '../utils/generatePDF';
 
 interface PlanModalProps {
@@ -22,23 +21,30 @@ const PlanModal: React.FC<PlanModalProps> = ({ isOpen, onClose }) => {
 
     const handleSelectPlan = async (planKey: PlanKey) => {
         if (planKey === user.plan) {
+            // FIX: Changed toast type from 'info' to 'success' as 'info' is not a valid type.
             showToast('Você já está neste plano.', 'success');
             return;
         }
 
         setIsProcessing(true);
         try {
-            // Call the edge function to create a checkout session
-            const { url } = await apiService.createCheckoutSession(planKey);
+            // Simulate backend call for plan upgrade
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
-            // Redirect the user to the Stripe checkout page
-            window.location.href = url;
+            const newPlanConfig = PLAN_CONFIGS[planKey];
+            const currentCredits = user.credits;
+            const newCredits = newPlanConfig.credits;
+            
+            // Add the new plan's credits to the user's current balance
+            updateUser({ plan: planKey, credits: currentCredits + newCredits });
+            
+            showToast(`Plano atualizado para ${newPlanConfig.name}!`, 'success');
+            onClose();
 
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro ao processar o pagamento.";
+            const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro ao atualizar o plano.";
             showToast(errorMessage, 'error');
         } finally {
-            // The user will be redirected, so this might not even be seen
             setIsProcessing(false);
         }
     };

@@ -1,36 +1,28 @@
-// FIX: Replaced placeholder content with a mock implementation of ApiService to resolve compilation errors.
 import { PlanKey } from '../types';
-import { supabase } from './supabaseClient';
 
 /**
- * API service to interact with Supabase Edge Functions.
+ * MOCK API service to simulate backend interactions.
+ * In a real application, this would make HTTP requests to a backend server.
  */
 class ApiService {
   /**
-   * Calls a Supabase Edge Function to create a Stripe checkout session.
+   * Simulates creating a Stripe checkout session for development and testing.
+   * NOTE: This is a mock implementation and does not process real payments.
    * @param plan - The key of the plan being purchased.
-   * @returns A promise that resolves to an object with the checkout URL from Stripe.
+   * @returns A promise that resolves to an object with a simulated checkout URL.
    */
   async createCheckoutSession(plan: PlanKey): Promise<{ url: string }> {
-    if (!supabase) {
-      throw new Error("Supabase client not initialized.");
-    }
+    console.log(`Simulating checkout session creation for plan ${plan}.`);
+    // Simulate a network delay
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    const { data, error } = await supabase.functions.invoke('stripe-checkout', {
-      body: { planKey: plan },
-    });
-
-    if (error) {
-      console.error("Error creating checkout session:", error.message);
-      throw new Error(`Falha ao criar sessão de pagamento: ${error.message}`);
-    }
+    // In a real app, this would be a URL from Stripe.
+    // Here, we simulate a success redirect URL with params for testing purposes.
+    const sessionId = `sim_${Date.now()}`;
+    const redirectUrl = `/checkout/success?plan=${plan}&session_id=${sessionId}`;
     
-    if (!data.url) {
-      console.error("No URL returned from checkout function:", data);
-       throw new Error("A função de checkout não retornou uma URL válida.");
-    }
-    
-    return { url: data.url };
+    console.log(`Simulated redirect to checkout: ${redirectUrl}`);
+    return { url: redirectUrl };
   }
 }
 
