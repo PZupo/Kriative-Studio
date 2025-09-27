@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Selections } from '../../types';
 import { FORMAT_CONFIGS } from '../../constants';
-import { geminiService } from '../../services/geminiService';
+import * as geminiService from '../../services/geminiService';
+import { isGeminiConfigured } from '../../services/geminiService';
 // FIX: Import useAuth from AuthContext to resolve missing member error.
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../common/Button';
@@ -26,8 +27,7 @@ const Step6Describe: React.FC<Props> = ({ selections, onUpdate, onSubmit, onBack
     const maxQuantity = formatConfig?.maxQuantity || 1;
     
     const hasEnoughCredits = user ? user.credits >= creditsNeeded : false;
-    const isAiConfigured = geminiService.isConfigured();
-
+    
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
@@ -51,7 +51,7 @@ const Step6Describe: React.FC<Props> = ({ selections, onUpdate, onSubmit, onBack
         showToast('Rascunho salvo com sucesso!');
     };
 
-    const isSubmitDisabled = !selections.prompt || (selections.inputType === 'Prompt de Imagem' && !selections.imagePrompt) || !hasEnoughCredits || !isAiConfigured;
+    const isSubmitDisabled = !selections.prompt || (selections.inputType === 'Prompt de Imagem' && !selections.imagePrompt) || !hasEnoughCredits || !isGeminiConfigured;
 
     useEffect(() => {
         // Cleanup object URL
@@ -95,8 +95,8 @@ const Step6Describe: React.FC<Props> = ({ selections, onUpdate, onSubmit, onBack
                     />
                     <button 
                         onClick={handleGeneratePrompt} 
-                        title={!isAiConfigured ? "Funcionalidade desabilitada em modo de demonstração" : "Gerar um prompt profissional"}
-                        disabled={!isAiConfigured}
+                        title={!isGeminiConfigured ? "Funcionalidade desabilitada em modo de demonstração" : "Gerar um prompt profissional"}
+                        disabled={!isGeminiConfigured}
                         className="absolute top-3 right-3 text-gray-400 hover:text-[#ff8c00] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400"
                     >
                        <i className="fa-solid fa-wand-magic-sparkles text-2xl"></i>
@@ -136,19 +136,19 @@ const Step6Describe: React.FC<Props> = ({ selections, onUpdate, onSubmit, onBack
                     </Button>
                 </div>
 
-                {!isAiConfigured && (
+                {!isGeminiConfigured && (
                     <p className="mt-2 text-orange-600 font-semibold text-center">
                         A geração de conteúdo está desabilitada pois a API Key do Google não foi configurada.
                     </p>
                 )}
 
-                {!hasEnoughCredits && isAiConfigured && (
+                {!hasEnoughCredits && isGeminiConfigured && (
                     <p className="mt-2 text-red-600 font-semibold text-center">
                        Créditos insuficientes para esta operação. <br/> Considere fazer um upgrade de plano para mais créditos.
                     </p>
                 )}
 
-                {hasEnoughCredits && isAiConfigured && (
+                {hasEnoughCredits && isGeminiConfigured && (
                     <p className="mt-2 text-gray-500 dark:text-gray-400 font-semibold">
                        Seu saldo: {user?.credits} Créditos
                     </p>

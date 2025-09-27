@@ -8,6 +8,7 @@ import CalendarScreen from './components/CalendarScreen';
 import LiveScreen from './components/LiveScreen'; // Novo
 import MissingConfigurationScreen from './components/MissingConfigurationScreen'; // Novo
 import { isSupabaseConfigured } from './services/supabaseClient';
+import * as geminiService from './services/geminiService';
 import { isGeminiConfigured } from './services/geminiService';
 
 // Studio components
@@ -23,7 +24,6 @@ import Step5InputType from './components/steps/Step5InputType';
 import Step6Describe from './components/steps/Step6Describe';
 import LoadingScreen from './components/LoadingScreen';
 import ResultScreen from './components/ResultScreen';
-import { geminiService } from './services/geminiService';
 
 type AppView = 'studio' | 'history' | 'calendar' | 'live';
 
@@ -67,9 +67,7 @@ const StudioView: React.FC = () => {
         try {
             const content = await geminiService.generateContent(selections);
             setGeneratedContent(content);
-            if (updateUser) {
-                 updateUser({ credits: user.credits - creditsNeeded });
-            }
+            updateUser({ credits: user.credits - creditsNeeded });
             showToast('Conteúdo gerado com sucesso!', 'success');
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";

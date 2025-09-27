@@ -6,7 +6,7 @@ import Button from './common/Button';
 import { isGeminiConfigured } from '../services/geminiService';
 
 // @ts-ignore
-const API_KEY = import.meta.env.VITE_API_KEY;
+const API_KEY = import.meta.env?.VITE_API_KEY;
 const ai = isGeminiConfigured ? new GoogleGenAI({ apiKey: API_KEY }) : null;
 
 // --- Funções de Codificação/Decodificação de Áudio ---

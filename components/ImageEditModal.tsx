@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Button from './common/Button';
-import { geminiService } from '../services/geminiService';
+import * as geminiService from '../services/geminiService';
+import { isGeminiConfigured } from '../services/geminiService';
 
 interface ImageEditModalProps {
     isOpen: boolean;
@@ -12,7 +13,7 @@ interface ImageEditModalProps {
 const ImageEditModal: React.FC<ImageEditModalProps> = ({ isOpen, imageUrl, onClose, onRegenerate }) => {
     const [prompt, setPrompt] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const isAiConfigured = geminiService.isConfigured();
+    const isAiConfigured = isGeminiConfigured;
 
     const handleRegenerateClick = async () => {
         if (!prompt.trim() || !isAiConfigured) return;

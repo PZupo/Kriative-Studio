@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Button from '../common/Button';
-import { geminiService } from '../../services/geminiService';
+import * as geminiService from '../../services/geminiService';
+import { isGeminiConfigured } from '../../services/geminiService';
 import { AIPlan } from '../../types';
 import { useNotification } from '../../contexts/NotificationContext';
 
@@ -14,7 +15,7 @@ const AIPlannerModal: React.FC<AIPlannerModalProps> = ({ isOpen, onClose }) => {
     const [topic, setTopic] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [plan, setPlan] = useState<AIPlan | null>(null);
-    const isAiConfigured = geminiService.isConfigured();
+    const isAiConfigured = isGeminiConfigured;
 
     const handleGeneratePlan = async () => {
         if (!topic.trim()) {

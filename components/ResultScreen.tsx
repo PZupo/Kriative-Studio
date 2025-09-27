@@ -4,9 +4,8 @@ import Button from './common/Button';
 import { useNotification } from '../contexts/NotificationContext';
 import { FORMAT_CONFIGS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
-import { geminiService } from '../services/geminiService';
+import * as geminiService from '../services/geminiService';
 import ImageEditModal from './ImageEditModal';
-import { useTheme } from '../contexts/ThemeContext';
 
 interface Props {
     content: GeneratedContent;
@@ -43,7 +42,7 @@ const ResultScreen: React.FC<Props> = ({ content, onReset, selections }) => {
             const fetchVideo = async () => {
                 try {
                     // @ts-ignore
-                    const apiKey = import.meta.env.VITE_API_KEY;
+                    const apiKey = import.meta.env?.VITE_API_KEY;
                     if (!apiKey) {
                         throw new Error("Chave de API do Gemini não encontrada para buscar o vídeo.");
                     }
