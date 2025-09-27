@@ -10,7 +10,6 @@ import { FORMAT_CONFIGS } from './constants';
 import AuthScreen from './components/AuthScreen';
 import HistoryScreen from './components/HistoryScreen';
 import CalendarScreen from './components/CalendarScreen';
-import LiveScreen from './components/LiveScreen';
 import MissingConfigurationScreen from './components/MissingConfigurationScreen';
 import LoadingScreen from './components/LoadingScreen';
 import ResultScreen from './components/ResultScreen';
@@ -24,7 +23,7 @@ import Step5InputType from './components/steps/Step5InputType';
 import Step6Describe from './components/steps/Step6Describe';
 
 
-type AppView = 'studio' | 'history' | 'calendar' | 'live';
+type AppView = 'studio' | 'history' | 'calendar';
 type StudioState = 'configuring' | 'loading' | 'result';
 
 const initialSelections: Selections = {
@@ -159,7 +158,6 @@ const App: React.FC = () => {
         case 'studio': return renderStudio();
         case 'history': return <HistoryScreen onNavigate={setView} onEdit={handleEditFromHistory} />;
         case 'calendar': return <CalendarScreen onNavigate={setView} />;
-        case 'live': return <LiveScreen />;
         default: return renderStudio();
     }
   };

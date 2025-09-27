@@ -8,7 +8,7 @@ import PlanModal from './PlanModal';
 import PromoCodeModal from './PromoCodeModal';
 import { useTheme } from '../contexts/ThemeContext';
 
-type AppView = 'studio' | 'history' | 'calendar' | 'live';
+type AppView = 'studio' | 'history' | 'calendar';
 
 interface HeaderProps {
     currentView: AppView;
@@ -55,7 +55,6 @@ const Header: React.FC<HeaderProps> = ({ currentView, onNavigate }) => {
                                 <NavButton view="studio" icon="fa-wand-magic-sparkles" label="Studio" />
                                 <NavButton view="history" icon="fa-images" label="Minhas Criações" />
                                 <NavButton view="calendar" icon="fa-calendar-alt" label="Calendário" />
-                                <NavButton view="live" icon="fa-microphone-alt" label="Conversa ao Vivo" />
                            </nav>
                         </div>
                         <div className="hidden md:flex items-center space-x-4">
