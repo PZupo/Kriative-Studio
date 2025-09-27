@@ -10,9 +10,10 @@ type AppView = 'studio' | 'history' | 'calendar';
 
 interface Props {
   onNavigate: (view: AppView) => void;
+  onEdit: (item: SavedContentItem) => void;
 }
 
-const HistoryScreen: React.FC<Props> = ({ onNavigate }) => {
+const HistoryScreen: React.FC<Props> = ({ onNavigate, onEdit }) => {
     const { user } = useAuth();
     const { showToast } = useNotification();
     const [savedItems, setSavedItems] = useState<SavedContentItem[]>([]);
@@ -99,6 +100,9 @@ const HistoryScreen: React.FC<Props> = ({ onNavigate }) => {
                    "{item.selections.prompt}"
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
+                    <Button variant="ghost" className="!px-3 !py-1 text-sm" onClick={() => onEdit(item)}>
+                        <i className="fa-solid fa-pencil mr-2"></i> Re-editar
+                    </Button>
                     <Button variant="ghost" className="!px-3 !py-1 text-sm" onClick={() => setItemToSchedule(item.id)}>
                         <i className="fa-solid fa-calendar-alt mr-2"></i> Agendar
                     </Button>

@@ -62,13 +62,9 @@ const generateImagePost = async (selections: Selections): Promise<GeneratedConte
         }
     `;
 
-    const imageGenerationPrompt = `
-        Um post de mídia social para ${platform}.
-        **Assunto Principal:** "${prompt}".
-        **Estilo Visual:** ${visualStyle}, cinematográfico, alta resolução, cor vibrante, iluminação dramática.
-        **Proporção da Imagem:** ${formatConfig.aspectRatio}.
-        A imagem não deve conter texto ou palavras.
-    `;
+    // FIX: Simplified the image generation prompt to be more direct and keyword-based, avoiding complex structures
+    // that could lead to an 'INVALID_ARGUMENT' error from the Imagen API.
+    const imageGenerationPrompt = `social media post, subject: ${prompt}, visual style: ${visualStyle}, cinematic, high resolution, vibrant color, dramatic lighting, aspect ratio ${formatConfig.aspectRatio}, no text, no words`;
 
     const textPromise = ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -173,10 +169,12 @@ const generateManga = async (selections: Selections): Promise<GeneratedContent> 
     const story = parseJsonResponse(storyResponse.text);
     const allPanelDescriptions = story.pages.flatMap((p: any) => p.panels.map((panel: any) => panel.image_description));
     
+    // FIX: Simplified the manga image generation prompt to be more direct and keyword-based,
+    // reducing the risk of an 'INVALID_ARGUMENT' error from the Imagen API.
     const imagePromises = allPanelDescriptions.map((desc: string) => 
         ai.models.generateImages({
             model: 'imagen-4.0-generate-001',
-            prompt: `Painel de mangá em preto e branco, estilo de arte ${visualStyle}. A cena é: ${desc}. Sem texto ou palavras, apenas a arte.`,
+            prompt: `black and white manga panel, art style: ${visualStyle}, scene: ${desc}, no text, no words, just the art`,
             config: { numberOfImages: 1, aspectRatio: '3:4', outputMimeType: 'image/png' }
         })
     );

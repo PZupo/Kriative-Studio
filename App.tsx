@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import { useNotification } from './contexts/NotificationContext';
-import { Selections, GeneratedContent } from './types';
+import { Selections, GeneratedContent, SavedContentItem } from './types';
 import { isSupabaseConfigured } from './services/supabaseClient';
 import * as geminiService from './services/geminiService';
 import { isGeminiConfigured } from './services/geminiService';
@@ -80,6 +80,14 @@ const App: React.FC = () => {
     setGeneratedContent(null);
   };
 
+  const handleEditFromHistory = (item: SavedContentItem) => {
+    setSelections(item.selections);
+    setStudioState('configuring');
+    setCurrentStep(1); // Start from the beginning with pre-filled selections
+    setView('studio');
+    showToast('Configurações carregadas para re-edição!', 'success');
+  };
+
   const creditsNeeded = useMemo(() => {
     const { format, quantity, duration, style } = selections;
     if (!format) return 1;
@@ -110,7 +118,7 @@ const App: React.FC = () => {
     try {
         const content = await geminiService.generateContent(selections);
         setGeneratedContent(content);
-        if (user) {
+        if (updateUser) {
             updateUser({ credits: user.credits - creditsNeeded });
         }
         setStudioState('result');
@@ -149,7 +157,7 @@ const App: React.FC = () => {
   const renderView = () => {
     switch(view) {
         case 'studio': return renderStudio();
-        case 'history': return <HistoryScreen onNavigate={setView} />;
+        case 'history': return <HistoryScreen onNavigate={setView} onEdit={handleEditFromHistory} />;
         case 'calendar': return <CalendarScreen onNavigate={setView} />;
         case 'live': return <LiveScreen />;
         default: return renderStudio();
