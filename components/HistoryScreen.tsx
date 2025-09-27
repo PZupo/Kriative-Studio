@@ -1,166 +1,152 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import type { SavedContentItem } from '../types';
-// FIX: Import useAuth from AuthContext to resolve missing member error.
+import { SavedContentItem } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import Button from './common/Button';
-import ScheduleModal from './ScheduleModal';
 import ConfirmationModal from './common/ConfirmationModal';
+import ScheduleModal from './common/ScheduleModal';
 
 type AppView = 'studio' | 'history' | 'calendar';
 
 interface Props {
-    onNavigate: (view: AppView) => void;
+  onNavigate: (view: AppView) => void;
 }
 
 const HistoryScreen: React.FC<Props> = ({ onNavigate }) => {
     const { user } = useAuth();
     const { showToast } = useNotification();
-    const [items, setItems] = useState<SavedContentItem[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [itemToSchedule, setItemToSchedule] = useState<SavedContentItem | null>(null);
-    const [itemToDelete, setItemToDelete] = useState<SavedContentItem | null>(null);
+    const [savedItems, setSavedItems] = useState<SavedContentItem[]>([]);
+    const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+    const [itemToSchedule, setItemToSchedule] = useState<string | null>(null);
 
-    const storageKey = `kriative_studio_saved_content_${user?.uid}`;
-
-    const loadItems = useCallback(() => {
+    const loadSavedItems = useCallback(() => {
         if (!user) return;
-        setIsLoading(true);
+        const key = `kriative_studio_saved_content_${user.uid}`;
         try {
-            const savedContentJson = localStorage.getItem(storageKey);
-            const savedContent: SavedContentItem[] = savedContentJson ? JSON.parse(savedContentJson) : [];
-            setItems(savedContent);
+            const items: SavedContentItem[] = JSON.parse(localStorage.getItem(key) || '[]');
+            setSavedItems(items);
         } catch (error) {
-            console.error("Failed to load saved content:", error);
-            showToast("Erro ao carregar suas criações.", "error");
-        } finally {
-            setIsLoading(false);
+            console.error("Error loading saved items:", error);
+            showToast("Falha ao carregar criações salvas.", "error");
         }
-    }, [user, storageKey, showToast]);
+    }, [user, showToast]);
 
     useEffect(() => {
-        loadItems();
-    }, [loadItems]);
+        loadSavedItems();
+    }, [loadSavedItems]);
 
-    const updateLocalStorage = (updatedItems: SavedContentItem[]) => {
-        localStorage.setItem(storageKey, JSON.stringify(updatedItems));
-        setItems(updatedItems);
+    const handleSaveItems = (items: SavedContentItem[]) => {
+        if (!user) return;
+        const key = `kriative_studio_saved_content_${user.uid}`;
+        localStorage.setItem(key, JSON.stringify(items));
+        setSavedItems(items);
     };
 
-    const handleConfirmSchedule = (isoDate: string) => {
-        if (!itemToSchedule) return;
-        const updatedItems = items.map(item =>
-            item.id === itemToSchedule.id ? { ...item, scheduledAt: isoDate } : item
-        );
-        updateLocalStorage(updatedItems);
-        showToast("Post agendado com sucesso!", "success");
-        setItemToSchedule(null);
-    };
-
-    const handleUnschedule = (id: string) => {
-        const updatedItems = items.map(item =>
-            item.id === id ? { ...item, scheduledAt: undefined } : item
-        );
-        updateLocalStorage(updatedItems);
-        showToast("Agendamento cancelado.", "success");
-    };
-    
-    const handleConfirmDelete = () => {
+    const handleDeleteConfirm = () => {
         if (!itemToDelete) return;
-        const updatedItems = items.filter(item => item.id !== itemToDelete.id);
-        updateLocalStorage(updatedItems);
-        showToast("Criação excluída.", "success");
+        const newItems = savedItems.filter(item => item.id !== itemToDelete);
+        handleSaveItems(newItems);
+        showToast('Item excluído com sucesso!', 'success');
         setItemToDelete(null);
     };
 
-
-    const renderItemCard = (item: SavedContentItem) => {
-        const preview = item.content.videoUrl || (item.content.images && item.content.images[0]) || (item.content.storyboards && item.content.storyboards[0][0].image);
-        const savedDate = new Date(item.savedAt).toLocaleDateString('pt-BR');
-
-        return (
-            <div key={item.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex flex-col transition-transform duration-300 hover:scale-105 hover:shadow-xl">
-                <div className="relative">
-                    {item.content.videoUrl ? (
-                         <div className="w-full h-48 bg-black flex items-center justify-center">
-                            <i className="fa-solid fa-film text-white text-4xl"></i>
-                         </div>
-                    ) : (
-                        <img src={preview} alt="Preview" className="w-full h-48 object-cover" />
-                    )}
-                    {item.scheduledAt && (
-                         <div className="absolute top-2 left-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-                            <i className="fa-solid fa-calendar-check"></i>
-                            <span>Agendado</span>
-                        </div>
-                    )}
-                </div>
-                <div className="p-4 flex-grow flex flex-col">
-                    <h3 className="font-bold text-lg text-gray-800 dark:text-gray-200">{item.selections.format} para {item.selections.platform}</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Salvo em: {savedDate}</p>
-                    
-                    {item.scheduledAt && (
-                        <p className="text-sm text-green-700 dark:text-green-400 mt-2 font-semibold">
-                           {new Date(item.scheduledAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
-                        </p>
-                    )}
-                    
-                    <div className="mt-auto pt-4 flex flex-wrap gap-2">
-                         {item.scheduledAt ? (
-                            <>
-                                <Button onClick={() => setItemToSchedule(item)} variant="secondary" className="py-1 px-3 text-sm flex-1">Reagendar</Button>
-                                <Button onClick={() => handleUnschedule(item.id)} variant="ghost" className="py-1 px-3 text-sm flex-1">Cancelar</Button>
-                            </>
-                         ) : (
-                             <Button onClick={() => setItemToSchedule(item)} variant="primary" className="py-1 px-3 text-sm flex-1">
-                                <i className="fa-solid fa-calendar-alt mr-2"></i>Agendar
-                            </Button>
-                         )}
-                         <button onClick={() => setItemToDelete(item)} className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 p-2 rounded-full transition-colors">
-                            <i className="fa-solid fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
+    const handleScheduleConfirm = (isoDate: string) => {
+        if (!itemToSchedule) return;
+        const newItems = savedItems.map(item =>
+            item.id === itemToSchedule ? { ...item, scheduledAt: isoDate } : item
         );
+        handleSaveItems(newItems);
+        showToast('Item agendado com sucesso! Veja no Calendário.', 'success');
+        setItemToSchedule(null);
     };
 
-    return (
-        <div className="max-w-6xl mx-auto animate-fade-in">
-            <div className="flex justify-between items-center mb-8">
-                <h1 className="text-4xl font-extrabold text-[#008080] dark:text-teal-400">Minhas Criações</h1>
-                <Button onClick={() => onNavigate('studio')} variant="secondary">
-                    <i className="fa-solid fa-plus mr-2"></i> Criar Novo Conteúdo
-                </Button>
-            </div>
+    const formatReadableDate = (isoString: string) => {
+        return new Date(isoString).toLocaleString('pt-BR', {
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
 
-            {isLoading ? (
-                <p className="text-center text-gray-600 dark:text-gray-400">Carregando suas criações...</p>
-            ) : items.length === 0 ? (
-                <div className="text-center py-16 bg-white/80 dark:bg-gray-800/90 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
-                        <i className="fa-solid fa-folder-open text-6xl text-gray-400 dark:text-gray-500 mb-4"></i>
+    const ItemCard: React.FC<{ item: SavedContentItem }> = ({ item }) => (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex flex-col">
+            <div className="relative h-48 bg-gray-200 dark:bg-gray-700">
+                {item.content.images && item.content.images[0] ? (
+                    <img src={item.content.images[0]} alt="Preview" className="w-full h-full object-cover" />
+                ) : item.content.storyboards && item.content.storyboards[0][0].image ? (
+                     <img src={item.content.storyboards[0][0].image} alt="Manga Preview" className="w-full h-full object-cover" />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-500">
+                        <i className={`fa-solid ${item.content.videoUrl ? 'fa-film' : 'fa-image'} text-4xl`}></i>
+                    </div>
+                )}
+                <div className="absolute top-2 right-2 bg-black/50 text-white text-xs font-bold px-2 py-1 rounded">
+                    {item.selections.format}
+                </div>
+            </div>
+            <div className="p-4 flex-grow flex flex-col">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Criado em: {formatReadableDate(item.savedAt)}
+                </p>
+                {item.scheduledAt && (
+                    <p className="text-sm font-semibold text-green-600 dark:text-green-400 mt-1">
+                        Agendado para: {formatReadableDate(item.scheduledAt)}
+                    </p>
+                )}
+                <p className="text-gray-700 dark:text-gray-300 text-sm mt-2 line-clamp-3 flex-grow">
+                   "{item.selections.prompt}"
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                    <Button variant="ghost" className="!px-3 !py-1 text-sm" onClick={() => setItemToSchedule(item.id)}>
+                        <i className="fa-solid fa-calendar-alt mr-2"></i> Agendar
+                    </Button>
+                    <Button variant="danger" className="!px-3 !py-1 text-sm" onClick={() => setItemToDelete(item.id)}>
+                        <i className="fa-solid fa-trash mr-2"></i> Excluir
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+    
+    return (
+        <>
+            <div className="max-w-6xl mx-auto animate-fade-in">
+                <div className="flex flex-wrap justify-between items-center mb-8 gap-4">
+                    <h1 className="text-4xl font-extrabold text-[#008080] dark:text-teal-400">Minhas Criações</h1>
+                    <Button onClick={() => onNavigate('studio')} variant="primary">
+                        <i className="fa-solid fa-plus mr-2"></i> Criar Novo Conteúdo
+                    </Button>
+                </div>
+                {savedItems.length === 0 ? (
+                    <div className="text-center py-16 bg-white/80 dark:bg-gray-800/80 rounded-lg shadow-md">
+                        <i className="fa-solid fa-folder-open text-5xl text-gray-400 dark:text-gray-500 mb-4"></i>
                         <h2 className="text-2xl font-bold text-gray-700 dark:text-gray-300">Nenhuma criação salva ainda</h2>
-                        <p className="text-gray-500 dark:text-gray-400 mt-2">Use o Studio para criar e salvar seu primeiro conteúdo!</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {items.map(renderItemCard)}
-                </div>
-            )}
+                        <p className="text-gray-500 dark:text-gray-400 mt-2">
+                           Volte ao Studio para criar seu primeiro conteúdo e salvá-lo aqui!
+                        </p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {savedItems.map(item => <ItemCard key={item.id} item={item} />)}
+                    </div>
+                )}
+            </div>
             
+            <ConfirmationModal
+                isOpen={!!itemToDelete}
+                onClose={() => setItemToDelete(null)}
+                onConfirm={handleDeleteConfirm}
+                title="Confirmar Exclusão"
+                message="Você tem certeza que deseja excluir esta criação? Esta ação não pode ser desfeita."
+            />
             <ScheduleModal
                 isOpen={!!itemToSchedule}
                 onClose={() => setItemToSchedule(null)}
-                onConfirm={handleConfirmSchedule}
+                onConfirm={handleScheduleConfirm}
             />
-                <ConfirmationModal
-                isOpen={!!itemToDelete}
-                onClose={() => setItemToDelete(null)}
-                onConfirm={handleConfirmDelete}
-                title="Excluir Criação"
-                message="Tem certeza que deseja excluir esta criação? Esta ação não pode ser desfeita."
-            />
-        </div>
+        </>
     );
 };
 
